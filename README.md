@@ -6,7 +6,7 @@
 
 ## ✨ Features
 
-- 🤖 **Smart RAG System** - Vector similarity search with Gemini 2.5 Flash
+- 🤖 **Smart RAG System** - Vector similarity search with Gemini
 - 📚 **Multi-Source** - Supports Next.js, React, TypeScript docs (extensible)
 - 🔄 **Version-Aware** - Intelligently handles documentation from multiple versions
 - ⚡ **Streaming Responses** - Real-time answer generation
@@ -29,8 +29,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/docs_talk.git
-cd docs_talk
+git clone https://github.com/hk-dev13/docstalk.git
+cd docstalk
 
 # Install dependencies
 pnpm install
@@ -283,4 +283,4 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ---
 
-**Built with ❤️ for developers who love good documentation**
+**Built with ❤️ for developers who hate reading manual documentation**
