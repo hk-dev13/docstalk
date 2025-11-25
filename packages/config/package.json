@@ -1,0 +1,13 @@
+{
+  "name": "@docstalk/config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.js",
+  "files": [
+    "eslint-base.js",
+    "eslint-react.js",
+    ".prettierrc.js",
+    "tsconfig.*.json",
+    "tailwind.preset.js"
+  ]
+}
