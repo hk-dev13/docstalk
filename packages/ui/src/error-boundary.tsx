@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import React from "react";
+import { AlertTriangle, RefreshCcw } from "lucide-react";
 
 interface Props {
   children: React.ReactNode;
@@ -33,14 +33,19 @@ export class ErrorBoundary extends React.Component<Props, State> {
     };
 
     try {
-      const existingErrors = JSON.parse(localStorage.getItem('app_errors') || '[]');
+      const existingErrors = JSON.parse(
+        localStorage.getItem("app_errors") || "[]"
+      );
       existingErrors.unshift(errorLog);
-      localStorage.setItem('app_errors', JSON.stringify(existingErrors.slice(0, 10))); // Keep last 10
+      localStorage.setItem(
+        "app_errors",
+        JSON.stringify(existingErrors.slice(0, 10))
+      ); // Keep last 10
     } catch (e) {
-      console.error('Failed to log error:', e);
+      console.error("Failed to log error:", e);
     }
 
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error("Error caught by boundary:", error, errorInfo);
   }
 
   render() {
@@ -61,7 +66,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 Oops! Something went wrong
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                {this.state.error?.message || 'An unexpected error occurred'}
+                {this.state.error?.message || "An unexpected error occurred"}
               </p>
             </div>
 

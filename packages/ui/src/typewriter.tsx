@@ -19,7 +19,7 @@ export function Typewriter({
   const [displayText, setDisplayText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isStarted, setIsStarted] = useState(false);
-  
+
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
 
@@ -45,5 +45,9 @@ export function Typewriter({
     }
   }, [currentIndex, isStarted, text, speed]);
 
-  return <span ref={ref} className={className}>{displayText}</span>;
+  return (
+    <span ref={ref} className={className}>
+      {displayText}
+    </span>
+  );
 }

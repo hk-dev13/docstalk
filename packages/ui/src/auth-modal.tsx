@@ -1,7 +1,13 @@
-'use client';
+"use client";
 
 import { SignIn } from "@clerk/nextjs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@docstalk/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "./dialog";
 import { Sparkles } from "lucide-react";
 
 interface AuthModalProps {
@@ -10,7 +16,11 @@ interface AuthModalProps {
   messageCount: number;
 }
 
-export function AuthModal({ open, onOpenChange, messageCount }: AuthModalProps) {
+export function AuthModal({
+  open,
+  onOpenChange,
+  messageCount,
+}: AuthModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -27,20 +37,22 @@ export function AuthModal({ open, onOpenChange, messageCount }: AuthModalProps) 
             Enjoying the conversation?
           </DialogTitle>
           <DialogDescription className="text-center">
-            You've sent {messageCount} messages. Sign up or log in to continue chatting and save your conversations!
+            You've sent {messageCount} messages. Sign up or log in to continue
+            chatting and save your conversations!
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="mt-4">
-          <SignIn 
+          <SignIn
             routing="hash"
             appearance={{
               elements: {
-                formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-                card: 'shadow-none',
-                rootBox: 'w-full',
-                formFieldInput: 'rounded-lg'
-              }
+                formButtonPrimary:
+                  "bg-primary text-primary-foreground hover:bg-primary/90",
+                card: "shadow-none",
+                rootBox: "w-full",
+                formFieldInput: "rounded-lg",
+              },
             }}
           />
         </div>

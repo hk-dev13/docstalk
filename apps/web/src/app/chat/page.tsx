@@ -12,7 +12,13 @@ import {
   getConversationMessages,
   saveMessage,
 } from "@/lib/api-client";
-import { ChatMessage, ChatInput, ConversationSidebar } from "@docstalk/ui";
+import {
+  ChatMessage,
+  ChatInput,
+  ConversationSidebar,
+  ModeToggle,
+  AuthModal,
+} from "@docstalk/ui";
 import {
   BookOpen,
   Menu,
@@ -22,8 +28,6 @@ import {
   PanelLeft,
 } from "lucide-react";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { ModeToggle } from "@/components/mode-toggle";
-import { AuthModal } from "@/components/auth-modal";
 
 const GUEST_MESSAGE_LIMIT = 5;
 const GUEST_MESSAGES_KEY = "docstalk_guest_messages";

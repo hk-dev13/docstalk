@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,8 +24,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { ThemeProvider, ErrorBoundary } from "@docstalk/ui";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ErrorBoundary } from "@/components/error-boundary";
 
 export default function RootLayout({
   children,

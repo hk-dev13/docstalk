@@ -202,21 +202,33 @@ importers:
 
   packages/ui:
     dependencies:
+      '@clerk/nextjs':
+        specifier: ^6.35.4
+        version: 6.35.4(next@16.0.3)(react-dom@19.2.0)(react@19.2.0)
       '@docstalk/types':
         specifier: workspace:*
         version: link:../types
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3)(@types/react@19.2.6)(react-dom@19.2.0)(react@19.2.0)
+      '@types/three':
+        specifier: ^0.181.0
+        version: 0.181.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      framer-motion:
+        specifier: ^12.23.24
+        version: 12.23.24(react-dom@19.2.0)(react@19.2.0)
       lucide-react:
         specifier: ^0.554.0
         version: 0.554.0(react@19.2.0)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.0)(react@19.2.0)
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.6)(react@19.2.0)
@@ -226,6 +238,9 @@ importers:
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
+      three:
+        specifier: ^0.181.2
+        version: 0.181.2
     devDependencies:
       '@tailwindcss/cli':
         specifier: ^4.1.17
