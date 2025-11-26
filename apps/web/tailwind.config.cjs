@@ -1,11 +1,18 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
+  presets: [
+    // Menggunakan preset shared dari folder packages/config (Opsional tapi Recommended)
+    // Pastikan path-nya benar relatif dari apps/web
+    require("../../packages/config/tailwind.preset.js") 
+  ],
   content: [
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
+    '../../packages/ui/src/**/*.{ts,tsx}',
+
   ],
   prefix: "",
   theme: {

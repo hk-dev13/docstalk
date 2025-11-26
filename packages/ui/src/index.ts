@@ -5,7 +5,7 @@
 
 // Base components
 export { Button, type ButtonProps } from './button';
-export { Dialog } from './dialog';
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './dialog';
 
 // Chat components
 export { ChatMessage } from './chat-message';

@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
   poweredByHeader: false,
+  transpilePackages: ["@docstalk/ui"],
   async rewrites() {
     return [
       {

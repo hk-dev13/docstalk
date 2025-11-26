@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@source "../../../../packages/ui/src";
+
+@plugin "tailwindcss-animate";
+
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -72,7 +76,7 @@
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
