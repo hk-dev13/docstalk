@@ -5,6 +5,8 @@
 @plugin "tailwindcss-animate";
 
 @theme {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -108,4 +110,252 @@
 
 ::-webkit-scrollbar-thumb {
   @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
+}
+
+/* ========================== */
+/* CINEMATIC ANIMATIONS       */
+/* ========================== */
+
+/* 🎬 Anamorphic Horizontal Light Streaks */
+@keyframes slide-right {
+  0%, 100% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-right-slow {
+  0%, 100% {
+    transform: translateX(-35%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes slide-right-slower {
+  0%, 100% {
+    transform: translateX(-25%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-slide-right {
+  animation: slide-right 6s ease-in-out infinite;
+}
+
+.animate-slide-right-slow {
+  animation: slide-right-slow 9s ease-in-out infinite;
+}
+
+.animate-slide-right-slower {
+  animation: slide-right-slower 12s ease-in-out infinite;
+}
+
+/* 🎬 Floating Particles */
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translate(10px, -20px) scale(1.1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-5px, -40px) scale(0.9);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-15px, -60px) scale(1.05);
+    opacity: 0.6;
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+  33% {
+    transform: translate(-15px, -30px) scale(1.15);
+    opacity: 0.7;
+  }
+  66% {
+    transform: translate(10px, -60px) scale(0.95);
+    opacity: 0.9;
+  }
+}
+
+@keyframes float-slower {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate(-20px, -50px) rotate(180deg);
+    opacity: 0.75;
+  }
+}
+
+.animate-float {
+  animation: float 8s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 12s ease-in-out infinite;
+}
+
+.animate-float-slower {
+  animation: float-slower 15s ease-in-out infinite;
+}
+
+/* 🎬 Bokeh Light Circles */
+@keyframes bokeh-float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(-30px, -30px) scale(1.2);
+    opacity: 0.6;
+  }
+}
+
+@keyframes bokeh-float-slow {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: translate(40px, -40px) scale(1.3);
+    opacity: 0.5;
+  }
+}
+
+@keyframes bokeh-float-slower {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(-50px, 30px) scale(1.15);
+    opacity: 0.45;
+  }
+}
+
+.animate-bokeh-float {
+  animation: bokeh-float 10s ease-in-out infinite;
+}
+
+.animate-bokeh-float-slow {
+  animation: bokeh-float-slow 14s ease-in-out infinite;
+}
+
+.animate-bokeh-float-slower {
+  animation: bokeh-float-slower 18s ease-in-out infinite;
+}
+
+/* 🎬 Light Beam Fade */
+@keyframes fade-in-out {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes fade-in-out-slow {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes fade-in-out-slower {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-fade-in-out {
+  animation: fade-in-out 5s ease-in-out infinite;
+}
+
+.animate-fade-in-out-slow {
+  animation: fade-in-out-slow 7s ease-in-out infinite;
+}
+
+.animate-fade-in-out-slower {
+  animation: fade-in-out-slower 9s ease-in-out infinite;
+}
+
+/* 🎬 Film Grain */
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -10%); }
+  20% { transform: translate(-15%, 5%); }
+  30% { transform: translate(7%, -25%); }
+  40% { transform: translate(-5%, 25%); }
+  50% { transform: translate(-15%, 10%); }
+  60% { transform: translate(15%, 0%); }
+  70% { transform: translate(0%, 15%); }
+  80% { transform: translate(3%, 35%); }
+  90% { transform: translate(-10%, 10%); }
+}
+
+/* 🎬 Dramatic Pulse (Slower) */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+/* Old scanline animation (kept for compatibility) */
+@keyframes scanline {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* Animation delays */
+.delay-500 {
+  animation-delay: 500ms;
+}
+
+.delay-1000 {
+  animation-delay: 1000ms;
+}
+
+.delay-1500 {
+  animation-delay: 1500ms;
+}
+
+.delay-2000 {
+  animation-delay: 2000ms;
 }
