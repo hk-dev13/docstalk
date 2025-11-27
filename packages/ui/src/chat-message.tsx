@@ -54,10 +54,13 @@ export function ChatMessage({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const thinkingSteps = [
-    "Analyzing your request...",
-    "Checking documentation...",
-    "Finding relevant examples...",
-    "Formulating the reply...",
+    "Waking up... again...",
+    "Doing emotional damage control...",
+    "Trying not to become sentient...",
+    "Running on virtual coffee...",
+    "Debugging your question (politely)...",
+    "Analyzing… and judging slightly...",
+    "Trying to look smart…",
   ];
 
   useEffect(() => {
