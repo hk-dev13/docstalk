@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from "@google/genai";
 
 /**
  * Reformulate query based on conversation history for better retrieval
@@ -34,19 +34,12 @@ export async function reformulateQuery(
 
   // Use LLM to reformulate query based on history
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.1, // Low temp for consistent reformulation
-        maxOutputTokens: 100,
-      },
-    });
+    const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
     const historyContext = conversationHistory
       .slice(-3) // Use last 3 messages for context
       .map((msg) => `${msg.role}: ${msg.content}`)
-      .join('\n');
+      .join("\n");
 
     const reformulationPrompt = `Given this conversation history:
 
@@ -57,15 +50,24 @@ The user now asks: "${query}"
 Task: Rewrite this question as a standalone, searchable query that:
 1. Preserves the technical context from conversation history
 2. Includes relevant keywords for documentation search
-3. Is in English (even if user asked in Indonesian)
+3. Is in English (even if user asked in other language)
 4. Is concise (max 15 words)
 
 Output ONLY the reformulated query, nothing else.
 
 Reformulated query:`;
 
-    const result = await model.generateContent(reformulationPrompt);
-    const reformulated = result.response.text().trim();
+    const result = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: reformulationPrompt,
+      config: {
+        temperature: 0.1, // Low temp for consistent reformulation
+        maxOutputTokens: 100,
+      },
+    });
+    const reformulated = result.text?.trim();
+
+    if (!reformulated) return query;
 
     // Log for debugging
     console.log(
@@ -74,7 +76,7 @@ Reformulated query:`;
 
     return reformulated;
   } catch (error) {
-    console.error('Query reformulation failed, using original:', error);
+    console.error("Query reformulation failed, using original:", error);
     return query; // Fallback to original on error
   }
 }

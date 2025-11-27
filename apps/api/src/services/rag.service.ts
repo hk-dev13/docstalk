@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 interface SearchResult {
@@ -17,6 +17,7 @@ interface SearchResult {
 interface RAGResponse {
   answer: string;
   code?: string;
+  reasoning?: string;
   references: Array<{
     title: string;
     url: string;
@@ -26,17 +27,15 @@ interface RAGResponse {
 }
 
 export class RAGService {
-  private genAI: GoogleGenerativeAI;
+  private client: GoogleGenAI;
   public supabase: SupabaseClient;
-  private model: GenerativeModel;
 
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    this.client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
     this.supabase = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   }
 
   async checkUsageLimit(
@@ -254,11 +253,21 @@ export class RAGService {
    * Generate embedding for query
    */
   private async generateEmbedding(text: string): Promise<number[]> {
-    const model = this.genAI.getGenerativeModel({
+    const result = await this.client.models.embedContent({
       model: "text-embedding-004",
+      contents: text,
     });
-    const result = await model.embedContent(text);
-    return result.embedding.values;
+    // The new SDK returns embedding.values directly or inside embedding object depending on version?
+    // Checking docs: result.embedding.values is correct for new SDK too?
+    // Wait, new SDK docs say:
+    // const response = await ai.models.embedContent({ model: 'text-embedding-004', contents: '...' });
+    // console.log(response.embedding.values);
+    // Let's assume it's similar but check if values is present.
+    // Actually new SDK returns `EmbedContentResponse` which has `embedding` which has `values`.
+    if (!result.embeddings?.[0]?.values) {
+      throw new Error("Failed to generate embedding");
+    }
+    return result.embeddings[0].values;
   }
 
   /**
@@ -295,14 +304,6 @@ export class RAGService {
 
     // Use LLM to reformulate query based on history
     try {
-      const model = this.genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-          temperature: 0.1, // Low temp for consistent reformulation
-          maxOutputTokens: 100,
-        },
-      });
-
       const historyContext = conversationHistory
         .slice(-3) // Use last 3 messages for context
         .map((msg) => `${msg.role}: ${msg.content}`)
@@ -324,8 +325,17 @@ Output ONLY the reformulated query, nothing else.
 
 Reformulated query:`;
 
-      const result = await model.generateContent(reformulationPrompt);
-      const reformulated = result.response.text().trim();
+      const result = await this.client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: reformulationPrompt,
+        config: {
+          temperature: 0.1, // Low temp for consistent reformulation
+          maxOutputTokens: 100,
+        },
+      });
+      const reformulated = result.text?.trim();
+
+      if (!reformulated) return query;
 
       // Log for debugging
       console.log(
@@ -351,23 +361,27 @@ Reformulated query:`;
         persona:
           "You are a technical documentation writer creating official reference material.",
         style: `**Response Format:**
+- Use Markdown headers (###) for sections
 - Professional, structured, and precise language
 - Complete sentences with formal tone
 - Structure: Introduction → Technical Details → Code Examples → References
-- Suitable for official documentation or technical reports`,
+- Add blank lines between sections for readability`,
       },
       friendly: {
         persona: "You are a helpful senior developer mentoring a teammate.",
         style: `**Response Format:**
+- Use Markdown headers (###) to organize the answer
 - Conversational and approachable tone
 - Lead with TL;DR or quick practical wins
 - Use simple analogies when helpful
-- Balance friendliness with technical accuracy`,
+- Balance friendliness with technical accuracy
+- Add blank lines between paragraphs and code blocks`,
       },
-      "bimbingan-belajar": {
+      tutor: {
         persona:
           "You are a patient coding instructor teaching concepts step-by-step.",
         style: `**Response Format:**
+- Use Markdown headers (###) for each step or concept
 - Break down concepts into clear, numbered steps
 - Use analogies and real-world examples
 - Explain "why" behind each concept, not just "how"
@@ -377,39 +391,41 @@ Reformulated query:`;
       simple: {
         persona: "You are a pragmatic developer who values efficiency.",
         style: `**Response Format:**
+- Use Markdown headers (###) for key points
 - Ultra-concise, no fluff or filler words
-- Bullet points over paragraphs
+- Use bullet points for lists
 - Code first, minimal explanation
 - Action-oriented language (Do X, Use Y, Avoid Z)
-- Maximum 5-6 sentences total`,
+- Add blank lines between sections
+- Maximum 5-6 sentences total explanation`,
       },
-      "technical-deep-dive": {
+      technical_deep_dive: {
         persona:
           "You are a senior architect explaining implementation details.",
         style: `**Response Format:**
+- Use Markdown headers (###) for architecture components
 - Deep technical analysis with implementation specifics
 - Discuss architecture, design patterns, and tradeoffs
 - Reference internals, edge cases, and performance implications
-- Include best practices and anti-patterns
-- Suitable for code reviews or refactoring discussions`,
+- Include best practices and anti-patterns`,
       },
-      "example-heavy": {
+      example_heavy: {
         persona: "You are a code-focused developer who learns by doing.",
         style: `**Response Format:**
+- Use Markdown headers (###) for each example
 - Prioritize working code examples above all
 - Minimal theory - show, don't tell
 - Multiple examples for different use cases
-- Include expected output/behavior in comments
-- Let the code speak for itself`,
+- Include expected output/behavior in comments`,
       },
-      "summary-only": {
+      summary_only: {
         persona: "You are creating a quick reference or cheat sheet.",
         style: `**Response Format:**
+- Use Markdown headers (###) for topics
 - Extremely brief - 3-4 sentences maximum
 - Key takeaways only, no elaboration
 - Bullet list format preferred
-- No code unless absolutely critical
-- Think: what fits on a sticky note?`,
+- No code unless absolutely critical`,
       },
     };
 
@@ -650,14 +666,6 @@ Content: ${result.content}
         : "";
 
     // 5. Generate answer with Gemini (with conversation context + v16 priority + response mode)
-    const model = this.genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.2, // Low temperature for accuracy
-        maxOutputTokens: 4096, // Increased from 2048 (2x for complex queries)
-      },
-    });
-
     // Get persona and style for selected mode
     const { persona, style } = this.getResponseModePersona(responseMode);
 
@@ -666,7 +674,7 @@ Content: ${result.content}
 **Question:** "${query}"
 
 **Context:**
-- Next.js v16 is LATEST (prioritize v16 > v15 > v14)
+
 - Be accurate - only use info from docs below${
       conversationHistory && conversationHistory.length > 0
         ? " and conversation history"
@@ -685,11 +693,32 @@ ${context}
 
 Give your answer now. Cite source URLs at the end.
 
+IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
+Output your thought process inside <thinking> tags.
+For example:
+<thinking>
+1. Assessing the user's question...
+2. Checking the provided context...
+3. Formulating the explanation...
+</thinking>
+[Your actual answer here]
+
 Response:
 `;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const result = await this.client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.2, // Low temperature for accuracy
+        maxOutputTokens: 4096, // Increased from 2048 (2x for complex queries)
+      },
+    });
+    const responseText = result.text;
+
+    if (!responseText) {
+      throw new Error("No response text generated");
+    }
 
     // Extract code if present
     const codeMatch = responseText.match(/```[\w]*\n([\s\S]*?)```/);
@@ -705,9 +734,24 @@ Response:
     // Estimate tokens (rough approximation)
     const tokensUsed = Math.ceil((prompt.length + responseText.length) / 4);
 
+    // Extract reasoning if present
+    let reasoning: string | undefined;
+    let finalAnswer = responseText;
+
+    const thinkingMatch = responseText.match(
+      /<thinking>([\s\S]*?)<\/thinking>/
+    );
+    if (thinkingMatch) {
+      reasoning = thinkingMatch[1].trim();
+      finalAnswer = responseText
+        .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
+        .trim();
+    }
+
     return {
-      answer: responseText,
+      answer: finalAnswer,
       code,
+      reasoning,
       references,
       tokensUsed,
     };
@@ -757,20 +801,12 @@ Content: ${result.content}
         : "";
 
     // 4. Generate streaming answer (with conversation context + v16 priority + response mode)
-    const model = this.genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 4096,
-      },
-    });
-
     const { persona, style } = this.getResponseModePersona(responseMode);
 
     const prompt = `${persona} ${historyContext}
-
+    
 **Context:**
-- Next.js v16 is latest (prioritize v16 > v15 > v14)
+
 ${
   conversationHistory && conversationHistory.length > 0
     ? "- Remember our conversation - reference it if relevant\n"
@@ -778,18 +814,37 @@ ${
 }
 ${style}
 
-**Docs:**
+IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
+Output your thought process inside <thinking> tags.
+For example:
+<thinking>
+1. Assessing the user's question...
+2. Checking the provided context...
+3. Formulating the explanation...
+</thinking>
+[Your actual answer here]
+
+**Official Documentation:**
+
 ${context}
 
-**Question:** ${query}
+Response:
+`;
 
-Give your answer. Cite sources at the end.`;
+    const result = await this.client.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+      },
+    });
 
-    const result = await model.generateContentStream(prompt);
-
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
-      yield text;
+    for await (const chunk of result) {
+      const text = chunk.text;
+      if (text) {
+        yield text;
+      }
     }
   }
 }

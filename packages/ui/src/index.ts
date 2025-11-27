@@ -25,6 +25,8 @@ export { cn } from "./lib/utils";
 export { Marquee } from "./marquee";
 export { GridPattern } from "./grid-pattern";
 export { BackToTop } from "./back-to-top";
+export * from "./skeleton";
+export * from "./animated-logo";
 export { Typewriter } from "./typewriter";
 export { LiquidText } from "./liquid-text";
 export { ModeToggle } from "./mode-toggle";

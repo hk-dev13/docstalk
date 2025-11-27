@@ -1,6 +1,6 @@
 {
   "name": "docstalk",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.1",
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel -r dev",
@@ -10,14 +10,25 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
-    "@types/node": "^20.10.0",
+    "@types/node": "^20.19.25",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3"
   },
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@10.23.0",
   "engines": {
     "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@clerk/shared",
+      "@parcel/watcher",
+      "esbuild",
+      "protobufjs",
+      "puppeteer",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

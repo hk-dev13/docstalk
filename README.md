@@ -7,11 +7,14 @@
 ## ✨ Features
 
 - 🤖 **Smart RAG System** - Vector similarity search with Gemini
+- 🧠 **Real Reasoning** - View the AI's step-by-step thought process before the answer
 - 📚 **Multi-Source** - Supports Next.js, React, TypeScript docs (extensible)
 - 🔄 **Version-Aware** - Intelligently handles documentation from multiple versions
-- ⚡ **Streaming Responses** - Real-time answer generation
+- ⚡ **Streaming Responses** - Real-time answer generation with "Thinking" UI
+- 🗣️ **Text-to-Speech** - Listen to answers with stop/cancel control
 - 💬 **Conversation History** - Context-aware follow-up questions
 - 🎯 **Response Modes** - 7 different response styles (Friendly, Formal, Tutorial, etc.)
+- 💻 **CLI Tool** - Manage scraping, indexing, and chat from the terminal
 - 🌓 **Dark/Light Mode** - Beautiful UI with theme toggle
 - 🔒 **Auth & Usage Limits** - Clerk authentication with rate limiting
 
@@ -39,10 +42,27 @@ pnpm install
 cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
 
+# Build all packages
+./scripts/build-all.sh
+
 # Run development servers
 ./scripts/dev-all.sh
-# OR
-pnpm --parallel -r dev
+```
+
+### CLI Usage
+
+DocsTalk comes with a powerful CLI tool for managing documentation:
+
+```bash
+# Link the CLI globally
+cd apps/cli
+pnpm link --global
+
+# Usage
+docstalk scrape <source>   # Scrape documentation
+docstalk index <source>    # Index documentation
+docstalk ask "question"    # Ask a question from terminal
+docstalk serve             # Start the API server
 ```
 
 ### Environment Setup
@@ -76,13 +96,18 @@ docs_talk/
 │   │   │   ├── components/
 │   │   │   └── lib/
 │   │   └── package.json
-│   └── api/              # Fastify backend
+│   ├── api/              # Fastify backend
+│   │   ├── src/
+│   │   │   ├── index.ts  # Main server
+│   │   │   └── services/
+│   │   ├── scripts/
+│   │   │   ├── scrape/   # Documentation scrapers
+│   │   │   └── index/    # Indexing scripts
+│   │   └── package.json
+│   └── cli/              # CLI Tool (NEW!)
 │       ├── src/
-│       │   ├── index.ts  # Main server
-│       │   └── services/
-│       ├── scripts/
-│       │   ├── scrape/   # Documentation scrapers
-│       │   └── index/    # Indexing scripts
+│       │   ├── commands/
+│       │   └── index.ts
 │       └── package.json
 │
 ├── packages/             # Shared packages
@@ -101,7 +126,7 @@ docs_talk/
 │   │   │   └── enums.ts
 │   │   └── package.json
 │   │
-│   ├── rag/             # RAG utilities (NEW!)
+│   ├── rag/             # RAG utilities
 │   │   ├── src/
 │   │   │   ├── embeddings.ts
 │   │   │   ├── usage-tracking.ts
@@ -137,10 +162,11 @@ docs_talk/
 - **Clerk** - Authentication & user management
 - **next-themes** - Dark/Light mode support
 
-### Backend
+### Backend & CLI
 
 - **Fastify** - Fast TypeScript web framework
-- **Google Gemini 2.5 Flash** - LLM for answer generation
+- **Commander.js** - CLI framework
+- **Google Gemini 2.5 Flash** - LLM for answer generation & reasoning
 - **Gemini text-embedding-004** - Vector embeddings
 - **Supabase** - PostgreSQL with pgvector
 - **Clerk** - Auth verification

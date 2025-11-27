@@ -1,6 +1,6 @@
 {
   "name": "@docstalk/rag",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.1",
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,11 +17,11 @@
   },
   "dependencies": {
     "@docstalk/types": "workspace:*",
-    "@google/generative-ai": "^0.21.0",
-    "@supabase/supabase-js": "^2.47.10"
+    "@google/genai": "^1.30.0",
+    "@supabase/supabase-js": "^2.86.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "typescript": "^5.0.0"
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3"
   }
 }

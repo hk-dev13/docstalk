@@ -163,7 +163,7 @@ export default function HomePage() {
 
   const faqs = [
     {
-      question: "Does DocsTalk use OpenAI?",
+      question: "Does DocsTalk use AI?",
       answer:
         "DocsTalk uses a combination of advanced AI models (including Gemini and open source models) optimized for technical understanding and code generation.",
     },
@@ -751,7 +751,8 @@ export default function HomePage() {
                 </li>
                 <li>
                   <Link
-                    href="#"
+                    href="https://discord.gg/"
+                    target="_blank"
                     className="hover:text-primary transition-colors"
                   >
                     Discord Community
@@ -759,7 +760,8 @@ export default function HomePage() {
                 </li>
                 <li>
                   <Link
-                    href="#"
+                    href="https://x.com/"
+                    target="_blank"
                     className="hover:text-primary transition-colors"
                   >
                     Twitter / X

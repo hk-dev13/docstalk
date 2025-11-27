@@ -55,17 +55,17 @@ export function ChatInput({
 
   return (
     <div className="p-6 bg-linear-to-t from-background via-background to-transparent">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-full lg:max-w-6xl mx-auto px-4">
         <div className="relative group rounded-3xl bg-secondary/40 border border-border/50 shadow-lg shadow-black/5 focus-within:shadow-primary/10 focus-within:border-primary/30 focus-within:bg-background transition-all duration-300 backdrop-blur-sm">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything..."
+            placeholder="What do you want to know?"
             disabled={disabled}
             rows={1}
-            className="w-full resize-none bg-transparent px-6 py-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 max-h-[200px] min-h-[60px]"
+            className="w-full resize-none bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 max-h-[200px] min-h-[30px]"
           />
           
           <div className="flex items-center justify-between px-4 pb-3 pt-2">
@@ -99,11 +99,11 @@ export function ChatInput({
                 >
                   <option value="friendly">Friendly</option>
                   <option value="formal">Formal</option>
-                  <option value="bimbingan-belajar">Tutor</option>
+                  <option value="tutor">Tutor</option>
                   <option value="simple">Simple</option>
-                  <option value="technical-deep-dive">Deep Dive</option>
-                  <option value="example-heavy">Examples</option>
-                  <option value="summary-only">Summary</option>
+                  <option value="technical_deep_dive">Deep Dive</option>
+                  <option value="example_heavy">Examples</option>
+                  <option value="summary_only">Summary</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none opacity-70" />
               </div>

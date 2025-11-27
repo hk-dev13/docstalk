@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DocsTalk - AI Documentation Assistant for Developers",
+  title: "DocsTalk - Smart Documentation Assistant for Developers",
   description:
     "Get accurate answers from official documentation with code examples. Stop reading, start building.",
   icons: {

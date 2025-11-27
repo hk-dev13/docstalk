@@ -19,7 +19,7 @@ export function getResponseModePersona(mode?: string): ResponseModePersona {
         role: 'a precise and professional technical consultant',
         tone: 'formal, structured, authoritative'
       };
-    case 'bimbingan-belajar':
+    case 'tutor':
       return {
         role: 'a patient and supportive coding tutor',
         tone: 'educational, step-by-step, nurturing'
@@ -29,17 +29,17 @@ export function getResponseModePersona(mode?: string): ResponseModePersona {
         role: 'a teacher explaining to a beginner',
         tone: 'simple, clear, avoiding jargon'
       };
-    case 'technical-deep-dive':
+    case 'technical_deep_dive':
       return {
         role: 'an expert engineer doing a technical deep-dive',
         tone: 'detailed, technical, comprehensive'
       };
-    case 'example-heavy':
+    case 'example_heavy':
       return {
         role: 'a practical developer who shows rather than tells',
         tone: 'code-first, example-driven, hands-on'
       };
-    case 'summary-only':
+    case 'summary_only':
       return {
         role: 'a concise technical writer',
         tone: 'brief, to-the-point, summary-focused'

@@ -18,6 +18,7 @@ import {
   ConversationSidebar,
   ModeToggle,
   AuthModal,
+  AnimatedLogo,
 } from "@docstalk/ui";
 import {
   BookOpen,
@@ -50,7 +51,38 @@ export default function ChatPage() {
   const [mounted, setMounted] = useState(false);
   const [guestMessageCount, setGuestMessageCount] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Swipe Gesture Logic
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && !isSidebarCollapsed) {
+      // Swipe Left -> Close Sidebar
+      setIsSidebarCollapsed(true);
+    }
+    if (isRightSwipe && isSidebarCollapsed) {
+      // Swipe Right -> Open Sidebar
+      setIsSidebarCollapsed(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -73,6 +105,7 @@ export default function ChatPage() {
           console.error("Failed to load guest messages:", error);
         }
       }
+      setIsLoadingConversations(false);
     }
   }, [user]);
 
@@ -96,6 +129,7 @@ export default function ChatPage() {
   // Fetch usage and conversations on load
   useEffect(() => {
     if (user?.id && user?.primaryEmailAddress?.emailAddress) {
+      setIsLoadingConversations(true);
       // Fetch usage
       getUsageStats(user.id, user.primaryEmailAddress.emailAddress)
         .then((stats) => {
@@ -112,7 +146,8 @@ export default function ChatPage() {
             setConversations(data.conversations);
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => setIsLoadingConversations(false));
     }
   }, [user]);
 
@@ -124,6 +159,7 @@ export default function ChatPage() {
   const handleSelectConversation = async (conversationId: string) => {
     try {
       setCurrentConversationId(conversationId);
+      // Optional: Add loading state for messages here if desired
       const data = await getConversationMessages(conversationId);
       if (data.messages) {
         const loadedMessages = data.messages.map((msg: any) => ({
@@ -170,6 +206,9 @@ export default function ChatPage() {
           .map((msg) => ({ role: msg.role, content: msg.content }));
 
         // Stream response without saving to database
+        let fullResponse = "";
+        let thinkingContent = "";
+
         for await (const chunk of streamChat(
           query,
           selectedSource,
@@ -178,10 +217,35 @@ export default function ChatPage() {
           history,
           responseMode
         )) {
-          assistantContent += chunk;
+          fullResponse += chunk;
+
+          // Parse thinking tags
+          const thinkingMatch = fullResponse.match(
+            /<thinking>([\s\S]*?)<\/thinking>/
+          );
+          if (thinkingMatch) {
+            thinkingContent = thinkingMatch[1].trim();
+          } else if (
+            fullResponse.includes("<thinking>") &&
+            !fullResponse.includes("</thinking>")
+          ) {
+            // Still streaming thinking content
+            const start = fullResponse.indexOf("<thinking>") + 10;
+            thinkingContent = fullResponse.slice(start).trim();
+          }
+
+          // Clean content (remove thinking tags)
+          const cleanContent = fullResponse
+            .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
+            .trim();
+
           setMessages((prev) => [
             ...prev.slice(0, -1),
-            { ...assistantMessage, content: assistantContent },
+            {
+              ...assistantMessage,
+              content: cleanContent,
+              reasoning: thinkingContent,
+            },
           ]);
         }
 
@@ -203,6 +267,10 @@ export default function ChatPage() {
         ]);
       } finally {
         setIsStreaming(false);
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { ...prev[prev.length - 1], isStreaming: false },
+        ]);
       }
       return;
     }
@@ -254,6 +322,9 @@ export default function ChatPage() {
         .map((msg) => ({ role: msg.role, content: msg.content }));
 
       // Stream response with conversation context
+      let fullResponse = "";
+      let thinkingContent = "";
+
       for await (const chunk of streamChat(
         query,
         selectedSource,
@@ -262,10 +333,35 @@ export default function ChatPage() {
         history,
         responseMode
       )) {
-        assistantContent += chunk;
+        fullResponse += chunk;
+
+        // Parse thinking tags
+        const thinkingMatch = fullResponse.match(
+          /<thinking>([\s\S]*?)<\/thinking>/
+        );
+        if (thinkingMatch) {
+          thinkingContent = thinkingMatch[1].trim();
+        } else if (
+          fullResponse.includes("<thinking>") &&
+          !fullResponse.includes("</thinking>")
+        ) {
+          // Still streaming thinking content
+          const start = fullResponse.indexOf("<thinking>") + 10;
+          thinkingContent = fullResponse.slice(start).trim();
+        }
+
+        // Clean content (remove thinking tags)
+        const cleanContent = fullResponse
+          .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
+          .trim();
+
         setMessages((prev) => [
           ...prev.slice(0, -1),
-          { ...assistantMessage, content: assistantContent },
+          {
+            ...assistantMessage,
+            content: cleanContent,
+            reasoning: thinkingContent,
+          },
         ]);
       }
 
@@ -290,13 +386,22 @@ export default function ChatPage() {
       ]);
     } finally {
       setIsStreaming(false);
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { ...prev[prev.length - 1], isStreaming: false },
+      ]);
     }
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div
+      className="flex h-screen bg-background overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Sidebar */}
-      {user && (
+      {mounted && user && (
         <ConversationSidebar
           userId={user.id}
           currentConversationId={currentConversationId || undefined}
@@ -305,6 +410,7 @@ export default function ChatPage() {
           conversations={conversations}
           isCollapsed={isSidebarCollapsed}
           toggleSidebar={toggleSidebar}
+          isLoading={isLoadingConversations}
         />
       )}
 
@@ -323,19 +429,14 @@ export default function ChatPage() {
               </button>
               <div className="flex items-center gap-3">
                 <div className="relative w-8 h-8">
-                  <Image
-                    src="/assets/logo/logo_docstalk.svg"
-                    alt="DocsTalk Logo"
-                    fill
-                    className="object-contain"
-                  />
+                  <AnimatedLogo variant="header" className="w-full h-full" />
                 </div>
                 <div>
                   <h1 className="text-lg font-bold gradient-text leading-none">
                     DocsTalk
                   </h1>
                   <p className="text-[10px] text-muted-foreground font-medium tracking-wide uppercase mt-0.5">
-                    Documentation AI Assistant
+                    Smart Documentation Assistant
                   </p>
                 </div>
               </div>
@@ -377,8 +478,8 @@ export default function ChatPage() {
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
                 <div className="relative mb-8 group">
                   <div className="absolute inset-0 bg-linear-to-r from-indigo-500 to-purple-600 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500" />
-                  <div className="relative bg-background border border-border/50 p-6 rounded-3xl shadow-2xl shadow-indigo-500/10">
-                    <Sparkles className="h-12 w-12 text-primary" />
+                  <div className="relative bg-background border border-border/50 p-6 rounded-3xl shadow-2xl shadow-indigo-500/10 w-24 h-24 flex items-center justify-center">
+                    <AnimatedLogo variant="loading" className="w-full h-full" />
                   </div>
                 </div>
 
