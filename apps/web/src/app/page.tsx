@@ -19,6 +19,7 @@ import {
   cn,
   Typewriter,
   LiquidText,
+  AnimatedLogo,
 } from "@docstalk/ui";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
@@ -191,12 +192,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="relative w-8 h-8">
-              <Image
-                src="/assets/logo/logo_docstalk.svg"
-                alt="DocsTalk Logo"
-                fill
-                className="object-contain"
-              />
+              <AnimatedLogo className="w-8 h-8" />
             </div>
             <span className="font-bold text-xl tracking-tight">DocsTalk</span>
           </div>
@@ -254,10 +250,9 @@ export default function HomePage() {
           </h1>
 
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Stop trusting stale AI answers.
-            We connect your AI directly to official docs.
-            Answered with official sources, accurate, and complete with code
-            examples.
+            Stop trusting stale AI answers. We connect your AI directly to
+            official docs. Answered with official sources, accurate, and
+            complete with code examples.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
