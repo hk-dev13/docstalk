@@ -8,6 +8,19 @@ import { Calendar, Tag, GitCommit } from "lucide-react";
 export default function ChangelogPage() {
   const changes = [
     {
+      version: "v0.2.0-beta.2",
+      date: "November 29, 2024",
+      title: "UI Polish & Pin Message",
+      type: "improvement",
+      items: [
+        "Added 'Pin Message' feature for conversations",
+        "Overhauled Sidebar UI with dynamic monochrome icons",
+        "Improved Chat Interface readability (wider layout)",
+        "Fixed Dropdown visibility issues (Modern Glass UI)",
+        "Enhanced dark mode support for all UI elements",
+      ],
+    },
+    {
       version: "v0.2.0-beta",
       date: "November 28, 2024",
       title: "Clarification Flow & UI Polish",
