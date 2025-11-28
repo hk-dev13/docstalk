@@ -3,6 +3,14 @@
  * Shared UI components for DocsTalk monorepo
  */
 
+// Auto-detect components
+export { RoutingIndicator } from "./routing-indicator";
+export { ClarificationFlow } from "./clarification-flow";
+export { ContextBreadcrumb } from "./context-breadcrumb";
+
+// Export styles
+import "./styles.css";
+
 // Base components
 export { Button, type ButtonProps } from "./button";
 export {

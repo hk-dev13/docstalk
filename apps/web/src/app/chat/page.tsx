@@ -5,12 +5,17 @@ import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import {
   ChatMessage as ChatMessageType,
-  streamChat,
+  streamChatAuto,
   getUsageStats,
   createConversation,
   getUserConversations,
   getConversationMessages,
   saveMessage,
+  updateConversation,
+  getSessionContext,
+  type RoutingMetadata,
+  type ClarificationResponse,
+  type SessionContext,
 } from "@/lib/api-client";
 import {
   ChatMessage,
@@ -19,6 +24,9 @@ import {
   ModeToggle,
   AuthModal,
   AnimatedLogo,
+  ClarificationFlow,
+  RoutingIndicator,
+  Button,
 } from "@docstalk/ui";
 import {
   BookOpen,
@@ -27,8 +35,12 @@ import {
   Sparkles,
   ChevronDown,
   PanelLeft,
+  Terminal,
+  Code,
+  FileCode,
+  Server,
 } from "lucide-react";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser, SignInButton } from "@clerk/nextjs";
 
 const GUEST_MESSAGE_LIMIT = 5;
 const GUEST_MESSAGES_KEY = "docstalk_guest_messages";
@@ -55,6 +67,17 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Router & Clarification State
+  const [routingMetadata, setRoutingMetadata] =
+    useState<RoutingMetadata | null>(null);
+  const [showClarification, setShowClarification] = useState(false);
+  const [clarificationOptions, setClarificationOptions] =
+    useState<ClarificationResponse | null>(null);
+  const [pendingQuery, setPendingQuery] = useState("");
+  const [sessionContext, setSessionContext] = useState<SessionContext | null>(
+    null
+  );
 
   // Swipe Gesture Logic
   const minSwipeDistance = 50;
@@ -173,114 +196,70 @@ export default function ChatPage() {
     }
   };
 
+  const handleTogglePin = async (conversationId: string, isPinned: boolean) => {
+    try {
+      // Optimistic update
+      setConversations((prev) =>
+        prev
+          .map((c) =>
+            c.id === conversationId ? { ...c, is_pinned: isPinned } : c
+          )
+          .sort((a, b) => {
+            // Sort by pinned (desc) then updated_at (desc)
+            if (a.is_pinned === b.is_pinned) {
+              return (
+                new Date(b.updated_at).getTime() -
+                new Date(a.updated_at).getTime()
+              );
+            }
+            return (a.is_pinned ? 1 : 0) > (b.is_pinned ? 1 : 0) ? -1 : 1;
+          })
+      );
+
+      await updateConversation(conversationId, { is_pinned: isPinned });
+
+      // Re-fetch to ensure sync (optional, but good for consistency)
+      if (user?.id) {
+        const data = await getUserConversations(user.id);
+        if (data.conversations) setConversations(data.conversations);
+      }
+    } catch (error) {
+      console.error("Failed to toggle pin:", error);
+      // Revert on error (could be improved)
+    }
+  };
+
   const handleSendMessage = async (query: string) => {
-    // Guest user handling
-    if (!user) {
-      // Check if guest has reached message limit
-      if (guestMessageCount >= GUEST_MESSAGE_LIMIT) {
-        setShowAuthModal(true);
-        return;
-      }
+    // Unified entry point: delegates to handleAutoDetectSend
+    // If selectedSource is "auto", forcedSource is undefined
+    // If selectedSource is specific (e.g. "nextjs"), it becomes forcedSource
+    const forcedSource = selectedSource === "auto" ? undefined : selectedSource;
+    await handleAutoDetectSend(query, forcedSource);
+  };
+  // Unified message handler for both Auto and Manual modes
+  const handleAutoDetectSend = async (
+    query: string,
+    forcedSource?: string,
+    skipUserMessage: boolean = false
+  ) => {
+    // Reset clarification state
+    setShowClarification(false);
+    setClarificationOptions(null);
+    setRoutingMetadata(null);
 
-      // Add user message
-      const userMessage: ChatMessageType = { role: "user", content: query };
-      setMessages((prev) => [...prev, userMessage]);
-
-      setIsStreaming(true);
-      let assistantContent = "";
-      const assistantMessage: ChatMessageType = {
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-
-      try {
-        // For guests, use a mock guest ID
-        const guestId = "guest_" + Date.now();
-        const guestEmail = "guest@temporary.com";
-
-        // Prepare conversation history
-        const history = messages
-          .filter((msg) => msg.content && msg.content.trim().length > 0)
-          .map((msg) => ({ role: msg.role, content: msg.content }));
-
-        // Stream response without saving to database
-        let fullResponse = "";
-        let thinkingContent = "";
-
-        for await (const chunk of streamChat(
-          query,
-          selectedSource,
-          guestId,
-          guestEmail,
-          history,
-          responseMode
-        )) {
-          fullResponse += chunk;
-
-          // Parse thinking tags
-          const thinkingMatch = fullResponse.match(
-            /<thinking>([\s\S]*?)<\/thinking>/
-          );
-          if (thinkingMatch) {
-            thinkingContent = thinkingMatch[1].trim();
-          } else if (
-            fullResponse.includes("<thinking>") &&
-            !fullResponse.includes("</thinking>")
-          ) {
-            // Still streaming thinking content
-            const start = fullResponse.indexOf("<thinking>") + 10;
-            thinkingContent = fullResponse.slice(start).trim();
-          }
-
-          // Clean content (remove thinking tags)
-          const cleanContent = fullResponse
-            .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
-            .trim();
-
-          setMessages((prev) => [
-            ...prev.slice(0, -1),
-            {
-              ...assistantMessage,
-              content: cleanContent,
-              reasoning: thinkingContent,
-            },
-          ]);
-        }
-
-        // Increment guest message counter
-        setGuestMessageCount((prev) => prev + 1);
-
-        // Show auth modal if this was the last allowed message
-        if (guestMessageCount + 1 >= GUEST_MESSAGE_LIMIT) {
-          setTimeout(() => setShowAuthModal(true), 1000); // Show after a brief delay
-        }
-      } catch (error: any) {
-        console.error("Stream error:", error);
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          {
-            role: "assistant",
-            content: "Sorry, an error occurred. Please try again.",
-          },
-        ]);
-      } finally {
-        setIsStreaming(false);
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          { ...prev[prev.length - 1], isStreaming: false },
-        ]);
-      }
+    // Guest user handling (check limit first)
+    if (!user && guestMessageCount >= GUEST_MESSAGE_LIMIT) {
+      setShowAuthModal(true);
       return;
     }
 
-    // Authenticated user handling (existing logic)
-    const userMessage: ChatMessageType = { role: "user", content: query };
-    setMessages((prev) => [...prev, userMessage]);
+    // Add user message to UI
+    if (!skipUserMessage) {
+      const userMessage: ChatMessageType = { role: "user", content: query };
+      setMessages((prev) => [...prev, userMessage]);
+    }
 
     setIsStreaming(true);
-    let assistantContent = "";
     const assistantMessage: ChatMessageType = {
       role: "assistant",
       content: "",
@@ -289,92 +268,176 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
-      const email = user.primaryEmailAddress?.emailAddress;
-      if (!email) throw new Error("No email found");
+      const email =
+        user?.primaryEmailAddress?.emailAddress || "guest@temporary.com";
+      const userId = user?.id || `guest_${Date.now()}`;
 
-      // Create conversation if it's a new chat
       let conversationId = currentConversationId;
-      if (!conversationId) {
-        const convData = await createConversation(
-          user.id,
-          selectedSource,
-          query.slice(0, 50),
-          email
-        );
-        conversationId = convData.conversationId;
-        setCurrentConversationId(conversationId);
 
-        // Refresh conversations list
-        const listData = await getUserConversations(user.id);
-        if (listData.conversations) {
-          setConversations(listData.conversations);
+      // For authenticated users, ensure conversation exists
+      if (user) {
+        if (!conversationId) {
+          try {
+            // Use forcedSource if available, otherwise default to "nextjs" for initial conversation creation
+            // "auto" is not a valid doc_source ID in the database
+            const initialSource =
+              forcedSource && forcedSource !== "auto" ? forcedSource : "nextjs";
+
+            const convData = await createConversation(
+              user.id,
+              initialSource,
+              query.slice(0, 50),
+              email
+            );
+            conversationId = convData.conversationId;
+            setCurrentConversationId(conversationId);
+
+            // Refresh conversations list
+            getUserConversations(user.id).then((data) => {
+              if (data.conversations) setConversations(data.conversations);
+            });
+          } catch (err) {
+            console.error("Failed to create conversation:", err);
+            // Continue anyway, just won't save to DB
+          }
+        }
+
+        // Save user message to DB
+        if (conversationId && !skipUserMessage) {
+          await saveMessage(conversationId, "user", query).catch(console.error);
         }
       }
 
-      if (!conversationId) throw new Error("Failed to initialize conversation");
-
-      // Save user message
-      await saveMessage(conversationId, "user", query);
-
-      // Prepare conversation history (exclude the current user message and streaming assistant message)
+      // Prepare conversation history
       const history = messages
         .filter((msg) => msg.content && msg.content.trim().length > 0)
         .map((msg) => ({ role: msg.role, content: msg.content }));
 
-      // Stream response with conversation context
       let fullResponse = "";
       let thinkingContent = "";
 
-      for await (const chunk of streamChat(
+      // Determine source to use: forcedSource takes precedence, otherwise check selectedSource
+      // If selectedSource is "auto", pass undefined to let backend detect
+      // If selectedSource is specific (e.g. "nextjs"), pass it as forcedSource
+      const sourceToUse =
+        forcedSource ||
+        (selectedSource === "auto" ? undefined : selectedSource);
+
+      // Stream with auto-detect API (used for both auto and manual)
+      console.log("[Unified Handler] Starting stream:", { query, sourceToUse });
+
+      for await (const event of streamChatAuto(
         query,
-        selectedSource,
-        user.id,
+        userId,
         email,
+        conversationId || undefined,
         history,
-        responseMode
+        responseMode,
+        sourceToUse
       )) {
-        fullResponse += chunk;
+        console.log("[Unified Handler] Event:", event.event);
 
-        // Parse thinking tags
-        const thinkingMatch = fullResponse.match(
-          /<thinking>([\s\S]*?)<\/thinking>/
-        );
-        if (thinkingMatch) {
-          thinkingContent = thinkingMatch[1].trim();
-        } else if (
-          fullResponse.includes("<thinking>") &&
-          !fullResponse.includes("</thinking>")
-        ) {
-          // Still streaming thinking content
-          const start = fullResponse.indexOf("<thinking>") + 10;
-          thinkingContent = fullResponse.slice(start).trim();
+        switch (event.event) {
+          case "routing":
+            setRoutingMetadata(event.data as RoutingMetadata);
+            break;
+
+          case "clarification":
+            console.log("🔥🔥🔥 [DEBUG] CLARIFICATION EVENT RECEIVED 🔥🔥🔥");
+            console.log("Data:", event.data);
+
+            // Force state updates
+            const options = event.data as ClarificationResponse;
+            console.log("Setting options:", options);
+
+            setClarificationOptions(options);
+            setShowClarification(true);
+            setPendingQuery(query);
+            setIsStreaming(false);
+
+            // Remove assistant message
+            setMessages((prev) => {
+              console.log(
+                "Removing assistant message, prev length:",
+                prev.length
+              );
+              return prev.slice(0, -1);
+            });
+
+            console.log("State updated. ShowClarification should be true.");
+            return;
+
+          case "content":
+            const chunk = (event.data as { chunk: string }).chunk;
+            fullResponse += chunk;
+
+            // Parse thinking tags
+            const thinkingMatch = fullResponse.match(
+              /<thinking>([\s\S]*?)<\/thinking>/
+            );
+            if (thinkingMatch) {
+              thinkingContent = thinkingMatch[1].trim();
+            } else if (
+              fullResponse.includes("<thinking>") &&
+              !fullResponse.includes("</thinking>")
+            ) {
+              const start = fullResponse.indexOf("<thinking>") + 10;
+              thinkingContent = fullResponse.slice(start).trim();
+            }
+
+            // Clean content
+            const cleanContent = fullResponse
+              .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
+              .trim();
+
+            setMessages((prev) => [
+              ...prev.slice(0, -1),
+              {
+                ...assistantMessage,
+                content: cleanContent,
+                reasoning: thinkingContent,
+              },
+            ]);
+            break;
+
+          case "done":
+            // Streaming complete
+            break;
         }
-
-        // Clean content (remove thinking tags)
-        const cleanContent = fullResponse
-          .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
-          .trim();
-
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          {
-            ...assistantMessage,
-            content: cleanContent,
-            reasoning: thinkingContent,
-          },
-        ]);
       }
 
-      // Save assistant message
-      await saveMessage(conversationId, "assistant", assistantContent);
+      // Post-stream actions
 
-      // Update usage after successful chat
-      setUsage((prev) => ({ ...prev, count: prev.count + 1 }));
+      // 1. Save assistant message for authenticated users
+      if (user && conversationId && fullResponse) {
+        await saveMessage(conversationId, "assistant", fullResponse).catch(
+          console.error
+        );
+      }
+
+      // 2. Increment guest counter
+      if (!user) {
+        setGuestMessageCount((prev) => prev + 1);
+        if (guestMessageCount + 1 >= GUEST_MESSAGE_LIMIT) {
+          setTimeout(() => setShowAuthModal(true), 1000);
+        }
+      }
+
+      // 3. Refresh session context
+      if (conversationId) {
+        getSessionContext(conversationId).then((ctx) => {
+          if (ctx) setSessionContext(ctx);
+        });
+      }
+
+      // 4. Update usage stats
+      if (user) {
+        setUsage((prev) => ({ ...prev, count: prev.count + 1 }));
+      }
     } catch (error: any) {
-      console.error("Stream error:", error);
+      console.error("Auto-detect error:", error);
 
       let errorMessage = "Sorry, an error occurred. Please try again.";
-
       if (error.message === "LIMIT_REACHED") {
         errorMessage =
           "🚫 Monthly limit reached (30/30). Please upgrade to continue.";
@@ -393,6 +456,17 @@ export default function ChatPage() {
     }
   };
 
+  // Handle clarification selection
+  const handleClarificationSelect = async (sourceId: string) => {
+    setShowClarification(false);
+
+    // Call unified handler with forced source
+    if (pendingQuery) {
+      await handleAutoDetectSend(pendingQuery, sourceId, true);
+      setPendingQuery("");
+    }
+  };
+
   return (
     <div
       className="flex h-screen bg-background overflow-hidden"
@@ -407,6 +481,7 @@ export default function ChatPage() {
           currentConversationId={currentConversationId || undefined}
           onSelectConversation={handleSelectConversation}
           onNewConversation={handleNewConversation}
+          onTogglePin={handleTogglePin}
           conversations={conversations}
           isCollapsed={isSidebarCollapsed}
           toggleSidebar={toggleSidebar}
@@ -456,16 +531,27 @@ export default function ChatPage() {
 
               <div className="ml-2 flex items-center gap-2">
                 <ModeToggle />
-                {mounted && (
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        avatarBox:
-                          "h-9 w-9 ring-2 ring-border/50 hover:ring-primary/50 transition-all",
-                      },
-                    }}
-                  />
-                )}
+                {mounted &&
+                  (user ? (
+                    <UserButton
+                      appearance={{
+                        elements: {
+                          avatarBox:
+                            "h-9 w-9 ring-2 ring-border/50 hover:ring-primary/50 transition-all",
+                        },
+                      }}
+                    />
+                  ) : (
+                    <SignInButton mode="modal">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="font-semibold"
+                      >
+                        Sign In
+                      </Button>
+                    </SignInButton>
+                  ))}
               </div>
             </div>
           </div>
@@ -473,7 +559,7 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-8 scroll-smooth">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
                 <div className="relative mb-8 group">
@@ -491,7 +577,7 @@ export default function ChatPage() {
                 <p className="text-muted-foreground max-w-lg mb-10 text-lg leading-relaxed">
                   Your intelligent companion for documentation.
                   <br className="hidden sm:block" />
-                  <span className="text-sm opacity-70">
+                  <span className="text-sm opacity-70 block">
                     Expanding soon to more platforms.
                   </span>
                 </p>
@@ -501,32 +587,44 @@ export default function ChatPage() {
                     {
                       label: "Create Next.js app",
                       query: "How do I create a Next.js app?",
+                      icon: <Terminal className="w-5 h-5 text-blue-500" />,
                     },
                     {
                       label: "Explain React hooks",
                       query: "Explain React hooks",
+                      icon: <Code className="w-5 h-5 text-purple-500" />,
                     },
                     {
                       label: "TypeScript generics",
                       query: "What are TypeScript generics?",
+                      icon: <FileCode className="w-5 h-5 text-yellow-500" />,
                     },
                     {
                       label: "Server Components",
                       query: "How to use Server Components?",
+                      icon: <Server className="w-5 h-5 text-green-500" />,
                     },
                   ].map((item, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSendMessage(item.query)}
                       disabled={isStreaming}
-                      className="group text-left p-4 rounded-xl border border-border/50 bg-secondary/30 hover:bg-secondary/60 hover:border-primary/20 transition-all duration-200"
+                      className="group relative text-left p-4 rounded-xl border border-border/50 bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 overflow-hidden"
                     >
-                      <span className="block text-sm font-medium text-foreground group-hover:text-primary transition-colors mb-1">
-                        {item.label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground opacity-70">
-                        "{item.query}"
-                      </span>
+                      <div className="absolute inset-0 bg-linear-to-r from-primary/0 via-primary/5 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                      <div className="flex items-start gap-3 relative z-10">
+                        <div className="p-2 rounded-lg bg-background/50 border border-border/50 group-hover:border-primary/20 transition-colors">
+                          {item.icon}
+                        </div>
+                        <div>
+                          <span className="block text-sm font-medium text-foreground group-hover:text-primary transition-colors mb-1">
+                            {item.label}
+                          </span>
+                          <span className="block text-xs text-muted-foreground opacity-70">
+                            "{item.query}"
+                          </span>
+                        </div>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -536,6 +634,29 @@ export default function ChatPage() {
                 {messages.map((msg, idx) => (
                   <ChatMessage key={idx} {...msg} />
                 ))}
+
+                {/* Routing Indicator */}
+                {routingMetadata && (
+                  <div className="flex justify-center my-4">
+                    <RoutingIndicator
+                      queryType={routingMetadata.queryType}
+                      detectedSource={routingMetadata.detectedSource}
+                      confidence={routingMetadata.confidence}
+                      reasoning={routingMetadata.reasoning}
+                      wasAutoDetected={routingMetadata.wasAutoDetected}
+                    />
+                  </div>
+                )}
+
+                {/* Clarification Flow */}
+                {showClarification && clarificationOptions && (
+                  <ClarificationFlow
+                    message={clarificationOptions.message}
+                    options={clarificationOptions.options}
+                    onSelect={handleClarificationSelect}
+                  />
+                )}
+
                 <div ref={messagesEndRef} className="h-4" />
               </div>
             )}

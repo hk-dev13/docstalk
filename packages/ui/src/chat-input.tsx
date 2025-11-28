@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, KeyboardEvent, useRef, useEffect } from 'react';
-import { Button } from './button';
-import { Send, Sparkles, ChevronDown, Globe, Bot } from 'lucide-react';
+import { useState, KeyboardEvent, useRef, useEffect } from "react";
+import { Button } from "./button";
+import { Send, Sparkles, ChevronDown, Globe, Bot } from "lucide-react";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -13,29 +13,29 @@ interface ChatInputProps {
   onResponseModeChange: (mode: string) => void;
 }
 
-export function ChatInput({ 
-  onSend, 
+export function ChatInput({
+  onSend,
   disabled,
   selectedSource,
   onSelectedSourceChange,
   responseMode,
-  onResponseModeChange
+  onResponseModeChange,
 }: ChatInputProps) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
     if (input.trim() && !disabled) {
       onSend(input.trim());
-      setInput('');
+      setInput("");
       if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = "auto";
       }
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -44,7 +44,7 @@ export function ChatInput({
   const adjustHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
+      textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
   };
@@ -54,9 +54,9 @@ export function ChatInput({
   }, [input]);
 
   return (
-    <div className="p-6 bg-linear-to-t from-background via-background to-transparent">
-      <div className="max-w-full lg:max-w-6xl mx-auto px-4">
-        <div className="relative group rounded-3xl bg-secondary/40 border border-border/50 shadow-lg shadow-black/5 focus-within:shadow-primary/10 focus-within:border-primary/30 focus-within:bg-background transition-all duration-300 backdrop-blur-sm">
+    <div className="p-4 bg-linear-to-t from-background via-background to-transparent">
+      <div className="w-full max-w-4xl mx-auto px-4">
+        <div className="relative group rounded-2xl bg-secondary/40 border border-border/50 shadow-lg shadow-black/5 ring-1 ring-white/5 focus-within:ring-primary/50 focus-within:shadow-[0_0_30px_-5px_rgba(var(--primary-rgb),0.3)] focus-within:border-primary/50 focus-within:bg-background transition-all duration-300 backdrop-blur-xl">
           <textarea
             ref={textareaRef}
             value={input}
@@ -65,47 +65,52 @@ export function ChatInput({
             placeholder="What do you want to know?"
             disabled={disabled}
             rows={1}
-            className="w-full resize-none bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 max-h-[200px] min-h-[30px]"
+            className="w-full resize-none bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 max-h-[200px] min-h-[24px]"
           />
-          
-          <div className="flex items-center justify-between px-4 pb-3 pt-2">
+
+          <div className="flex items-center justify-between px-3 pb-2 pt-1">
             <div className="flex items-center gap-2">
               {/* Source Selector */}
               <div className="relative group/source">
                 <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none">
-                  <Globe className="h-3.5 w-3.5 text-muted-foreground group-hover/source:text-primary transition-colors" />
+                  {selectedSource === "auto" ? (
+                    <Sparkles className="h-3.5 w-3.5 text-primary group-hover/source:text-primary transition-colors" />
+                  ) : (
+                    <Globe className="h-3.5 w-3.5 text-foreground group-hover/source:text-primary transition-colors" />
+                  )}
                 </div>
                 <select
                   value={selectedSource}
                   onChange={(e) => onSelectedSourceChange(e.target.value)}
-                  className="appearance-none pl-7 pr-6 py-1.5 rounded-full bg-background/50 border border-border/50 hover:bg-background hover:border-primary/30 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                  className="appearance-none pl-7 pr-6 py-1.5 rounded-lg bg-secondary/20 backdrop-blur-md border border-white/10 hover:bg-secondary/40 hover:border-white/20 text-xs font-medium text-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                 >
-                  <option value="nextjs">Next.js</option>
-                  <option value="react">React</option>
-                  <option value="typescript">TypeScript</option>
+                  <option value="auto" className="bg-zinc-950 text-white">Auto</option>
+                  <option value="nextjs" className="bg-zinc-950 text-white">Next.js</option>
+                  <option value="react" className="bg-zinc-950 text-white">React</option>
+                  <option value="typescript" className="bg-zinc-950 text-white">TypeScript</option>
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none opacity-70" />
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-foreground/50 pointer-events-none" />
               </div>
 
               {/* Response Mode Selector */}
               <div className="relative group/mode">
                 <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none">
-                  <Bot className="h-3.5 w-3.5 text-muted-foreground group-hover/mode:text-primary transition-colors" />
+                  <Bot className="h-3.5 w-3.5 text-foreground group-hover/mode:text-primary transition-colors" />
                 </div>
                 <select
                   value={responseMode}
                   onChange={(e) => onResponseModeChange(e.target.value)}
-                  className="appearance-none pl-7 pr-6 py-1.5 rounded-full bg-background/50 border border-border/50 hover:bg-background hover:border-primary/30 text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                  className="appearance-none pl-7 pr-6 py-1.5 rounded-lg bg-secondary/20 backdrop-blur-md border border-white/10 hover:bg-secondary/40 hover:border-white/20 text-xs font-medium text-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                 >
-                  <option value="friendly">Friendly</option>
-                  <option value="formal">Formal</option>
-                  <option value="tutor">Tutor</option>
-                  <option value="simple">Simple</option>
-                  <option value="technical_deep_dive">Deep Dive</option>
-                  <option value="example_heavy">Examples</option>
-                  <option value="summary_only">Summary</option>
+                  <option value="friendly" className="bg-zinc-950 text-white">Friendly</option>
+                  <option value="formal" className="bg-zinc-950 text-white">Formal</option>
+                  <option value="tutor" className="bg-zinc-950 text-white">Tutor</option>
+                  <option value="simple" className="bg-zinc-950 text-white">Simple</option>
+                  <option value="technical_deep_dive" className="bg-zinc-950 text-white">Deep Dive</option>
+                  <option value="example_heavy" className="bg-zinc-950 text-white">Examples</option>
+                  <option value="summary_only" className="bg-zinc-950 text-white">Summary</option>
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none opacity-70" />
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-foreground/50 pointer-events-none" />
               </div>
             </div>
 
@@ -113,10 +118,10 @@ export function ChatInput({
               onClick={handleSend}
               disabled={!input.trim() || disabled}
               size="icon"
-              className={`h-9 w-9 rounded-full transition-all duration-300 ${
+              className={`h-8 w-8 rounded-lg transition-all duration-300 ${
                 input.trim() && !disabled
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:scale-105'
-                  : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:scale-105"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
               }`}
             >
               {disabled ? (
@@ -127,9 +132,9 @@ export function ChatInput({
             </Button>
           </div>
         </div>
-        
+
         <p className="text-[10px] text-muted-foreground text-center mt-3 opacity-60">
-          Smart Documentation Assistant • Powered by DocsTalk
+          DocsTalk Smart Documentation Assistant • Powered by Gemini
         </p>
       </div>
     </div>

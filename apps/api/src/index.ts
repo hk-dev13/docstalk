@@ -3,6 +3,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { RAGService } from "./services/rag.service.js";
+import { RouterService } from "./services/router.service.js";
+import { registerAutoDetectRoutes } from "./services/auto-detect.routes.js";
 
 const fastify = Fastify({
   logger: true,
@@ -10,6 +12,9 @@ const fastify = Fastify({
 
 // Initialize RAG service
 const ragService = new RAGService();
+
+// Initialize Router service
+const routerService = new RouterService(ragService.supabase);
 
 // Register plugins
 await fastify.register(cors, {
@@ -26,8 +31,8 @@ await fastify.register(rateLimit as any, {
     const userId = (req.body as any)?.userId || (req.query as any)?.userId;
 
     // Authenticated users: 60 requests per minute
-    // Guest users: 5 requests per minute
-    return userId ? 60 : 5;
+    // Guest users: 30 requests per minute
+    return userId ? 60 : 30;
   },
   timeWindow: "1 minute",
   keyGenerator: (req: any) => {
@@ -50,6 +55,9 @@ await fastify.register(rateLimit as any, {
     };
   },
 });
+
+// Register auto-detect routes
+await registerAutoDetectRoutes(fastify, ragService, routerService);
 
 // Debug endpoint to check table schema
 fastify.get("/api/debug/schema", async (request, reply) => {
@@ -357,19 +365,20 @@ fastify.get<{
 });
 
 // Update conversation title
+// Update conversation (title, pin)
 fastify.patch<{
   Params: { id: string };
-  Body: { title: string };
+  Body: { title?: string; is_pinned?: boolean };
 }>("/api/v1/conversations/:id", async (request, reply) => {
   try {
     const { id } = request.params;
-    const { title } = request.body;
+    const { title, is_pinned } = request.body;
 
-    if (!title) {
-      return reply.code(400).send({ error: "title is required" });
+    if (title === undefined && is_pinned === undefined) {
+      return reply.code(400).send({ error: "No updates provided" });
     }
 
-    await ragService.updateConversationTitle(id, title);
+    await ragService.updateConversation(id, { title, is_pinned });
     return { success: true };
   } catch (error) {
     fastify.log.error(error);

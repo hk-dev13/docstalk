@@ -63,7 +63,8 @@ export default function HomePage() {
         containerRef.current.contains(e.target as Node)
       ) {
         const isAtBottom =
-          window.innerHeight + window.scrollY >= document.body.offsetHeight - 10;
+          window.innerHeight + window.scrollY >=
+          document.body.offsetHeight - 10;
 
         // Allow scrolling down to reach bottom
         if (e.deltaY > 0 && !isAtBottom) return;
@@ -715,7 +716,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <Link
-                    href="#"
+                    href="/pricing"
                     className="hover:text-primary transition-colors"
                   >
                     Pricing
@@ -723,7 +724,7 @@ export default function HomePage() {
                 </li>
                 <li>
                   <Link
-                    href="#"
+                    href="/changelog"
                     className="hover:text-primary transition-colors"
                   >
                     Changelog

@@ -9,6 +9,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   History,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "./lib/utils";
@@ -20,6 +22,7 @@ interface Conversation {
   doc_source: string;
   created_at: string;
   updated_at: string;
+  is_pinned?: boolean;
 }
 
 interface ConversationSidebarProps {
@@ -27,6 +30,7 @@ interface ConversationSidebarProps {
   currentConversationId?: string;
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
+  onTogglePin?: (id: string, isPinned: boolean) => void;
   conversations: Conversation[];
   isCollapsed: boolean;
   toggleSidebar: () => void;
@@ -38,6 +42,7 @@ export function ConversationSidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onTogglePin,
   conversations,
   isCollapsed,
   toggleSidebar,
@@ -102,7 +107,7 @@ export function ConversationSidebar({
           {!isCollapsed && (
             <button
               onClick={onNewConversation}
-              className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl font-medium transition-all duration-200 border border-primary/20 hover:border-primary/30 mr-2"
+              className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium transition-all duration-200 shadow-lg shadow-primary/20 hover:shadow-primary/30 mr-2"
             >
               <Plus className="h-4 w-4" />
               <span className="text-sm">New Chat</span>
@@ -131,7 +136,7 @@ export function ConversationSidebar({
           <div className="px-2 pb-4 flex justify-center">
             <button
               onClick={onNewConversation}
-              className="p-3 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl transition-all duration-200 border border-primary/20 hover:border-primary/30"
+              className="p-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl transition-all duration-200 shadow-lg shadow-primary/20"
               title="New Chat"
             >
               <Plus className="h-5 w-5" />
@@ -195,67 +200,167 @@ export function ConversationSidebar({
               )}
             </div>
           ) : (
-            filteredConversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => onSelectConversation(conv.id)}
-                title={isCollapsed ? conv.title : undefined}
-                className={cn(
-                  "group w-full rounded-lg transition-all duration-200 relative overflow-hidden flex items-center",
-                  currentConversationId === conv.id
-                    ? "bg-secondary text-foreground"
-                    : "hover:bg-secondary/50 text-muted-foreground hover:text-foreground",
-                  isCollapsed ? "justify-center p-3" : "text-left p-3"
-                )}
-              >
-                {/* Active Indicator */}
-                {currentConversationId === conv.id && (
-                  <div className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full" />
-                )}
+            filteredConversations
+              .slice(0, isCollapsed ? 5 : undefined)
+              .map((conv) => {
+                const getIconPath = (source: string) => {
+                  const map: Record<string, string> = {
+                    nextjs: "/assets/support_docs/icons8-nextjs.svg",
+                    react: "/assets/support_docs/icons8-react.svg",
+                    typescript: "/assets/support_docs/icons8-typescript.svg",
+                    tailwind: "/assets/support_docs/icons8-tailwind-css.svg",
+                    nodejs: "/assets/support_docs/icons8-nodejs.svg",
+                    express: "/assets/support_docs/icons8-express-js.svg",
+                    go: "/assets/support_docs/icons8-go.svg",
+                    python: "/assets/support_docs/icons8-python.svg",
+                    rust: "/assets/support_docs/icons8-rust-programming-language.svg",
+                    prisma: "/assets/support_docs/icons8-prisma-orm.svg",
+                  };
+                  return map[source.toLowerCase()] || null;
+                };
 
-                {isCollapsed ? (
-                  <MessageSquare
+                const iconPath = getIconPath(conv.doc_source);
+
+                return (
+                  <div
+                    key={conv.id}
+                    onClick={() => onSelectConversation(conv.id)}
+                    title={isCollapsed ? conv.title : undefined}
                     className={cn(
-                      "h-5 w-5 shrink-0",
+                      "group w-full rounded-lg transition-all duration-200 relative overflow-hidden flex items-center border border-transparent cursor-pointer",
                       currentConversationId === conv.id
-                        ? "text-primary"
-                        : "text-muted-foreground"
+                        ? "bg-secondary/80 text-foreground border-border/50 shadow-sm"
+                        : "hover:bg-secondary/50 text-muted-foreground hover:text-foreground",
+                      isCollapsed ? "justify-center p-3" : "text-left p-3"
                     )}
-                  />
-                ) : (
-                  <div className="flex items-start gap-3 pl-2 w-full overflow-hidden">
-                    <MessageSquare
-                      className={cn(
-                        "h-4 w-4 mt-1 shrink-0",
-                        currentConversationId === conv.id
-                          ? "text-primary"
-                          : "text-muted-foreground"
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={cn(
-                          "text-sm font-medium truncate",
-                          currentConversationId === conv.id
-                            ? "text-primary"
-                            : "text-foreground"
+                  >
+                    {/* Active Indicator */}
+                    {currentConversationId === conv.id && (
+                      <div className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full" />
+                    )}
+
+                    {isCollapsed ? (
+                      iconPath ? (
+                        <div
+                          className={cn(
+                            "h-5 w-5 shrink-0 bg-current transition-opacity",
+                            currentConversationId === conv.id
+                              ? "opacity-100"
+                              : "opacity-70 group-hover:opacity-100"
+                          )}
+                          style={{
+                            maskImage: `url(${iconPath})`,
+                            WebkitMaskImage: `url(${iconPath})`,
+                            maskSize: "contain",
+                            WebkitMaskSize: "contain",
+                            maskRepeat: "no-repeat",
+                            WebkitMaskRepeat: "no-repeat",
+                            maskPosition: "center",
+                            WebkitMaskPosition: "center",
+                          }}
+                        />
+                      ) : (
+                        <MessageSquare
+                          className={cn(
+                            "h-5 w-5 shrink-0",
+                            currentConversationId === conv.id
+                              ? "text-primary"
+                              : "text-muted-foreground"
+                          )}
+                        />
+                      )
+                    ) : (
+                      <div className="flex items-start gap-3 pl-2 w-full overflow-hidden">
+                        {iconPath ? (
+                          <div
+                            className={cn(
+                              "h-4 w-4 mt-1 shrink-0 bg-current transition-opacity",
+                              currentConversationId === conv.id
+                                ? "opacity-100"
+                                : "opacity-70 group-hover:opacity-100"
+                            )}
+                            style={{
+                              maskImage: `url(${iconPath})`,
+                              WebkitMaskImage: `url(${iconPath})`,
+                              maskSize: "contain",
+                              WebkitMaskSize: "contain",
+                              maskRepeat: "no-repeat",
+                              WebkitMaskRepeat: "no-repeat",
+                              maskPosition: "center",
+                              WebkitMaskPosition: "center",
+                            }}
+                          />
+                        ) : (
+                          <MessageSquare
+                            className={cn(
+                              "h-4 w-4 mt-1 shrink-0",
+                              currentConversationId === conv.id
+                                ? "text-primary"
+                                : "text-muted-foreground"
+                            )}
+                          />
                         )}
-                      >
-                        {conv.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-background/50 text-muted-foreground border border-border/50">
-                          {conv.doc_source}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground/60 truncate">
-                          {formatDate(conv.updated_at)}
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={cn(
+                              "text-sm font-medium truncate",
+                              currentConversationId === conv.id
+                                ? "text-primary"
+                                : "text-foreground"
+                            )}
+                          >
+                            {conv.title}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-background/50 text-muted-foreground border border-border/50">
+                              {conv.doc_source}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/60 truncate">
+                              {formatDate(conv.updated_at)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Pin Action */}
+                        {!isCollapsed && onTogglePin && (
+                          <div
+                            className={cn(
+                              "absolute right-2 top-1/2 -translate-y-1/2 flex gap-1",
+                              conv.is_pinned
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100 transition-opacity"
+                            )}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTogglePin(conv.id, !conv.is_pinned);
+                              }}
+                              className="p-1.5 rounded-md hover:bg-background/80 text-muted-foreground hover:text-foreground transition-colors"
+                              title={
+                                conv.is_pinned
+                                  ? "Unpin conversation"
+                                  : "Pin conversation"
+                              }
+                            >
+                              {conv.is_pinned ? (
+                                <PinOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Pin className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pinned Indicator (Collapsed) */}
+                        {isCollapsed && conv.is_pinned && (
+                          <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full ring-1 ring-background" />
+                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
-                )}
-              </button>
-            ))
+                );
+              })
           )}
         </div>
       </div>

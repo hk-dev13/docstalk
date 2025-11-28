@@ -215,8 +215,9 @@ export class RAGService {
 
     const { data: conversations } = await this.supabase
       .from("conversations")
-      .select("id, title, doc_source, created_at, updated_at")
+      .select("id, title, doc_source, created_at, updated_at, is_pinned")
       .eq("user_id", user.id)
+      .order("is_pinned", { ascending: false })
       .order("updated_at", { ascending: false })
       .limit(limit);
 
@@ -237,15 +238,15 @@ export class RAGService {
   }
 
   /**
-   * Update conversation title
+   * Update conversation (title, pinned status, etc)
    */
-  async updateConversationTitle(
+  async updateConversation(
     conversationId: string,
-    title: string
+    updates: { title?: string; is_pinned?: boolean }
   ): Promise<void> {
     await this.supabase
       .from("conversations")
-      .update({ title })
+      .update(updates)
       .eq("id", conversationId);
   }
 
@@ -687,6 +688,8 @@ ${
 }
 ${style}
 
+IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
+
 **Official Documentation:**
 
 ${context}
@@ -814,6 +817,8 @@ ${
 }
 ${style}
 
+IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
+
 IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
 Output your thought process inside <thinking> tags.
 For example:
@@ -837,6 +842,391 @@ Response:
       config: {
         temperature: 0.2,
         maxOutputTokens: 4096,
+      },
+    });
+
+    for await (const chunk of result) {
+      const text = chunk.text;
+      if (text) {
+        yield text;
+      }
+    }
+  }
+
+  /**
+   * Generate answer with router integration
+   * Used by auto-detect endpoints
+   */
+  async generateAnswerWithRouter(
+    query: string,
+    primarySource: string,
+    additionalSources?: string[],
+    conversationHistory?: Array<{ role: string; content: string }>,
+    responseMode: string = "friendly",
+    docSourceInstructions?: string
+  ): Promise<RAGResponse> {
+    // If multi-source, merge results
+    if (additionalSources && additionalSources.length > 0) {
+      return this.generateMultiSourceAnswer(
+        query,
+        [primarySource, ...additionalSources],
+        conversationHistory,
+        responseMode
+      );
+    }
+
+    // Single source with optional specialized instructions
+    const searchQuery = await this.reformulateQuery(query, conversationHistory);
+    const searchResults = await this.searchDocumentation(
+      searchQuery,
+      primarySource,
+      5
+    );
+
+    if (searchResults.length === 0) {
+      return {
+        answer:
+          "I couldn't find relevant information in the documentation. Please try rephrasing your question.",
+        references: [],
+        tokensUsed: 0,
+      };
+    }
+
+    const expandedResults = await this.getExpandedContext(searchResults);
+    const context = expandedResults
+      .map(
+        (result) => `[${result.title}]
+URL: ${result.url}
+Content: ${result.content}
+`
+      )
+      .join("\n---\n");
+
+    const historyContext =
+      conversationHistory && conversationHistory.length > 0
+        ? `\n**Previous conversation:**\n${conversationHistory
+            .slice(-4)
+            .map((msg) => `${msg.role}: ${msg.content}`)
+            .join("\n")}\n\n`
+        : "";
+
+    const { persona, style } = this.getResponseModePersona(responseMode);
+
+    // Add doc source instructions if provided
+    const specializedInstructions = docSourceInstructions
+      ? `\n\n**Your Expertise:**\n${docSourceInstructions}\n`
+      : "";
+
+    const prompt = `${persona} ${historyContext}Your teammate asked:
+
+**Question:** "${query}"
+
+**Context:**
+
+- Be accurate - only use info from docs below${
+      conversationHistory && conversationHistory.length > 0
+        ? " and conversation history"
+        : ""
+    }
+${
+  conversationHistory && conversationHistory.length > 0
+    ? "- Remember our conversation - reference it if relevant\n"
+    : ""
+}
+${style}
+${specializedInstructions}
+
+**Official Documentation:**
+
+${context}
+
+Give your answer now. Cite source URLs at the end.
+
+IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
+Output your thought process inside <thinking> tags.
+
+Response:
+`;
+
+    const result = await this.client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+      },
+    });
+    const responseText = result.text;
+
+    if (!responseText) {
+      throw new Error("No response text generated");
+    }
+
+    const codeMatch = responseText.match(/```[\w]*\n([\s\S]*?)```/);
+    const code = codeMatch ? codeMatch[1].trim() : undefined;
+
+    const references = searchResults.slice(0, 3).map((result) => ({
+      title: result.title,
+      url: result.url,
+      snippet: result.content.substring(0, 150) + "...",
+    }));
+
+    const tokensUsed = Math.ceil((prompt.length + responseText.length) / 4);
+
+    let reasoning: string | undefined;
+    let finalAnswer = responseText;
+
+    const thinkingMatch = responseText.match(
+      /<thinking>([\s\S]*?)<\/thinking>/
+    );
+    if (thinkingMatch) {
+      reasoning = thinkingMatch[1].trim();
+      finalAnswer = responseText
+        .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
+        .trim();
+    }
+
+    return {
+      answer: finalAnswer,
+      code,
+      reasoning,
+      references,
+      tokensUsed,
+    };
+  }
+
+  /**
+   * Generate answer from multiple doc sources
+   */
+  private async generateMultiSourceAnswer(
+    query: string,
+    sources: string[],
+    conversationHistory?: Array<{ role: string; content: string }>,
+    responseMode: string = "friendly"
+  ): Promise<RAGResponse> {
+    const searchQuery = await this.reformulateQuery(query, conversationHistory);
+
+    // Search each source
+    const allResults: SearchResult[] = [];
+    for (const source of sources) {
+      const results = await this.searchDocumentation(searchQuery, source, 3);
+      allResults.push(...results);
+    }
+
+    if (allResults.length === 0) {
+      return {
+        answer:
+          "I couldn't find relevant information across the requested documentation sources.",
+        references: [],
+        tokensUsed: 0,
+      };
+    }
+
+    // Sort by similarity and take top results
+    const topResults = allResults
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 6);
+
+    const expandedResults = await this.getExpandedContext(topResults);
+    const context = expandedResults
+      .map(
+        (result) => `[${result.title}] (Source: ${result.source})
+URL: ${result.url}
+Content: ${result.content}
+`
+      )
+      .join("\n---\n");
+
+    const historyContext =
+      conversationHistory && conversationHistory.length > 0
+        ? `\n**Previous conversation:**\n${conversationHistory
+            .slice(-4)
+            .map((msg) => `${msg.role}: ${msg.content}`)
+            .join("\n")}\n\n`
+        : "";
+
+    const { persona, style } = this.getResponseModePersona(responseMode);
+
+    const prompt = `${persona} ${historyContext}Your teammate asked a question that spans multiple documentation sources:
+
+**Question:** "${query}"
+
+**Context:**
+
+- You have access to information from: ${sources.join(", ")}
+- Synthesize information across sources when relevant
+- Clearly indicate which source each piece of information comes from
+${style}
+
+IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
+
+**Official Documentation (Multiple Sources):**
+
+${context}
+
+Give your answer now. Cite source URLs and indicate which framework/library each part refers to.
+
+Response:
+`;
+
+    const result = await this.client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+      },
+    });
+    const responseText = result.text;
+
+    if (!responseText) {
+      throw new Error("No response text generated");
+    }
+
+    const references = topResults.slice(0, 5).map((result) => ({
+      title: `${result.title} (${result.source})`,
+      url: result.url,
+      snippet: result.content.substring(0, 150) + "...",
+    }));
+
+    const tokensUsed = Math.ceil((prompt.length + responseText.length) / 4);
+
+    return {
+      answer: responseText,
+      references,
+      tokensUsed,
+    };
+  }
+
+  /**
+   * Generate streaming answer from multiple doc sources
+   */
+  async *generateMultiSourceAnswerStream(
+    query: string,
+    sources: string[],
+    conversationHistory?: Array<{ role: string; content: string }>,
+    responseMode: string = "friendly"
+  ): AsyncGenerator<string, void, unknown> {
+    const searchQuery = await this.reformulateQuery(query, conversationHistory);
+
+    // Search each source
+    const allResults: SearchResult[] = [];
+    for (const source of sources) {
+      const results = await this.searchDocumentation(searchQuery, source, 3);
+      allResults.push(...results);
+    }
+
+    if (allResults.length === 0) {
+      yield "I couldn't find relevant information across the requested documentation sources.";
+      return;
+    }
+
+    // Sort by similarity and take top results
+    const topResults = allResults
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 6);
+
+    const expandedResults = await this.getExpandedContext(topResults);
+    const context = expandedResults
+      .map(
+        (result) => `[${result.title}] (Source: ${result.source})
+URL: ${result.url}
+Content: ${result.content}
+`
+      )
+      .join("\n---\n");
+
+    const historyContext =
+      conversationHistory && conversationHistory.length > 0
+        ? `\n**Previous conversation:**\n${conversationHistory
+            .slice(-4)
+            .map((msg) => `${msg.role}: ${msg.content}`)
+            .join("\n")}\n\n`
+        : "";
+
+    const { persona, style } = this.getResponseModePersona(responseMode);
+
+    const prompt = `${persona} ${historyContext}Your teammate asked a question that spans multiple documentation sources:
+
+**Question:** "${query}"
+
+**Context:**
+
+- You have access to information from: ${sources.join(", ")}
+- Synthesize information across sources when relevant
+- Clearly indicate which source each piece of information comes from
+${style}
+
+IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
+
+**Official Documentation (Multiple Sources):**
+
+${context}
+
+Give your answer now. Cite source URLs and indicate which framework/library each part refers to.
+
+Response:
+`;
+
+    const result = await this.client.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+      },
+    });
+
+    for await (const chunk of result) {
+      const text = chunk.text;
+      if (text) {
+        yield text;
+      }
+    }
+  }
+
+  /**
+   * Generate streaming answer for general queries (fallback agent)
+   */
+  async *generateGeneralAnswerStream(
+    query: string,
+    conversationHistory?: Array<{ role: string; content: string }>,
+    responseMode: string = "friendly"
+  ): AsyncGenerator<string, void, unknown> {
+    const historyContext =
+      conversationHistory && conversationHistory.length > 0
+        ? `\n**Previous conversation:**\n${conversationHistory
+            .slice(-4)
+            .map((msg) => `${msg.role}: ${msg.content}`)
+            .join("\n")}\n\n`
+        : "";
+
+    const { persona, style } = this.getResponseModePersona(responseMode);
+
+    const prompt = `${persona} ${historyContext}The user asked a question that is NOT in the documentation.
+
+**Question:** "${query}"
+
+**Instructions:**
+1. Answer the question using your general knowledge.
+2. Be helpful and accurate.
+3. IMPORTANT: Start your response with a disclaimer that this topic is not covered in the official documentation.
+   - English: "Note: This topic is not covered in the official documentation, but here is a general answer:"
+   - Indonesian: "Catatan: Topik ini tidak tercakup dalam dokumentasi resmi, namun berikut adalah jawaban umum:"
+4. Respect the user's language (Indonesian/English).
+${style}
+
+IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
+
+Response:
+`;
+
+    const result = await this.client.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.3, // Slightly higher for general creativity
+        maxOutputTokens: 2048,
       },
     });
 
