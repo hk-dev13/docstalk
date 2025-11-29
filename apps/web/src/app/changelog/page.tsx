@@ -9,7 +9,20 @@ export default function ChangelogPage() {
   const changes = [
     {
       version: "v0.2.0-beta.3",
-      date: "November 29, 2024",
+      date: "November 30, 2025",
+      title: "Hybrid Architecture & Scalability",
+      type: "major",
+      items: [
+        "Migrated to Hybrid Architecture (Supabase + Qdrant) for massive scalability",
+        "Added CLI Auto-Indexing with `--index` flag",
+        "Optimized database storage (99% reduction in Postgres size)",
+        "Enhanced Smart Meta Query with dynamic tech stack detection",
+        "Added new documentation sources: Python, Go, Rust, Node.js, etc.",
+      ],
+    },
+    {
+      version: "v0.2.0-beta.2",
+      date: "November 29, 2025",
       title: "UI Polish & Pin Message",
       type: "improvement",
       items: [
@@ -22,7 +35,7 @@ export default function ChangelogPage() {
     },
     {
       version: "v0.2.0-beta",
-      date: "November 28, 2024",
+      date: "November 28, 2025",
       title: "Clarification Flow & UI Polish",
       type: "major",
       items: [
@@ -35,7 +48,7 @@ export default function ChangelogPage() {
     },
     {
       version: "v0.1.5",
-      date: "November 25, 2024",
+      date: "November 25, 2025",
       title: "Monorepo Migration",
       type: "improvement",
       items: [
@@ -47,7 +60,7 @@ export default function ChangelogPage() {
     },
     {
       version: "v0.1.0",
-      date: "November 20, 2024",
+      date: "November 20, 2025",
       title: "Initial Beta Release",
       type: "major",
       items: [
