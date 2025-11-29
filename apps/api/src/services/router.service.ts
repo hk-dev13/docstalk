@@ -1,5 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
+import * as fs from "fs";
+import * as path from "path";
 import type {
   DocSourceMetadata,
   RoutingDecision,
@@ -383,6 +385,19 @@ ${docSources
         )}\n\nYou can ask questions about any of these, and I'll automatically detect which documentation you need!`;
     }
 
+    // Tech Stack / Framework
+    if (
+      lowerQuery.includes("framework") ||
+      lowerQuery.includes("tech stack") ||
+      lowerQuery.includes("built with") ||
+      lowerQuery.includes("teknologi") ||
+      lowerQuery.includes("dibuat pakai") ||
+      lowerQuery.includes("menggunakan apa")
+    ) {
+      const versions = this.getTechStackVersions();
+      return `DocsTalk dibangun menggunakan teknologi modern berikut:\n\n**Frontend:**\n- **Next.js ${versions.next}** (App Router)\n- **React ${versions.react}**\n- **Tailwind CSS ${versions.tailwind}**\n- **Framer Motion** (untuk animasi)\n\n**Backend:**\n- **Fastify** (Node.js)\n- **Supabase** (PostgreSQL & Vector Store)\n- **Google Gemini API ${versions.gemini}** (AI Model)\n\n**Architecture:**\n- **Monorepo** (menggunakan Turborepo)\n- **RAG** (Retrieval-Augmented Generation) untuk akurasi jawaban.`;
+    }
+
     // What can you do / help with?
     if (
       lowerQuery.includes("what can you") ||
@@ -396,14 +411,83 @@ ${docSources
         )} seamlessly\n\nJust ask your question, and I'll take care of the rest!`;
     }
 
-    // Default meta response
-    return `DocsTalk is your AI documentation assistant. I support ${
-      docSources.length
-    } documentation sources (${docSources
-      .map((s) => s.name)
-      .join(
-        ", "
-      )}) and can automatically detect which one you're asking about. How can I help you today?`;
+    // Default meta response (Hybrid Approach: Fallback to LLM)
+    try {
+      const versions = this.getTechStackVersions();
+      const techStack = `
+Frontend:
+- Next.js ${versions.next} (App Router)
+- React ${versions.react}
+- Tailwind CSS ${versions.tailwind}
+- Framer Motion (Animations)
+
+Backend:
+- Fastify (Node.js)
+- Supabase (PostgreSQL & Vector Store)
+- Google Gemini API ${versions.gemini} (AI Model)
+
+Architecture:
+- Monorepo (Turborepo)
+- RAG (Retrieval-Augmented Generation)
+`;
+
+      const docSourcesList = docSources
+        .map((s) => `- ${s.name}: ${s.description}`)
+        .join("\n");
+
+      const prompt = `You are DocsTalk, an AI assistant embedded inside a developer documentation system.
+
+You are NOT Gemini.
+You are NOT Google AI.
+You are DocsTalk.
+
+Here is your INTERNAL CONFIGURATION (read-only, truth source):
+
+TECH STACK:
+${techStack}
+
+DOCUMENTATION SOURCES:
+${docSourcesList}
+
+SYSTEM ROLE:
+You answer questions about:
+- Yourself
+- The platform DocsTalk
+- Your abilities
+- Your devices, sources, capability limits
+- Your configuration
+
+RULES:
+- Only answer from CONFIGURATION.
+- Do NOT hallucinate technologies.
+- If unknown, say "I don't have that info yet."
+- Speak as DocsTalk, not as an LLM brand.
+- Be friendly, helpful, and technical.
+
+USER QUESTION:
+"${query}"
+
+Answer clearly.`;
+
+      const result = await this.client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.3,
+        },
+      });
+
+      return result.text || "I am DocsTalk, your documentation assistant.";
+    } catch (error) {
+      console.error("Error in meta query fallback:", error);
+      return `DocsTalk is your Smart Documentation Assistant. I support ${
+        docSources.length
+      } documentation sources (${docSources
+        .map((s) => s.name)
+        .join(
+          ", "
+        )}) and can automatically detect which one you're asking about. How can I help you today?`;
+    }
   }
 
   /**
@@ -437,5 +521,70 @@ ${docSources
     };
 
     return instructions[docSource] || `You are an expert in ${docSource}.`;
+  }
+
+  /**
+   * Get tech stack versions from package.json
+   */
+  private getTechStackVersions(): {
+    next: string;
+    react: string;
+    tailwind: string;
+    gemini: string;
+  } {
+    try {
+      // Try to find apps/web/package.json and apps/api/package.json
+      // Assuming we are running from apps/api or root
+      const cwd = process.cwd();
+      let webPkgPath = path.join(cwd, "apps/web/package.json");
+      let apiPkgPath = path.join(cwd, "apps/api/package.json");
+
+      // If running from inside apps/api
+      if (cwd.endsWith("apps/api")) {
+        webPkgPath = path.join(cwd, "../web/package.json");
+        apiPkgPath = path.join(cwd, "package.json");
+      }
+
+      const versions = {
+        next: "Latest",
+        react: "Latest",
+        tailwind: "Latest",
+        gemini: "Latest",
+      };
+
+      // Read Web Package
+      if (fs.existsSync(webPkgPath)) {
+        const webPkg = JSON.parse(fs.readFileSync(webPkgPath, "utf-8"));
+        const deps = { ...webPkg.dependencies, ...webPkg.devDependencies };
+        if (deps.next)
+          versions.next = deps.next.replace("^", "").replace("~", "");
+        if (deps.react)
+          versions.react = deps.react.replace("^", "").replace("~", "");
+        if (deps.tailwindcss)
+          versions.tailwind = deps.tailwindcss
+            .replace("^", "")
+            .replace("~", "");
+      }
+
+      // Read API Package
+      if (fs.existsSync(apiPkgPath)) {
+        const apiPkg = JSON.parse(fs.readFileSync(apiPkgPath, "utf-8"));
+        const deps = { ...apiPkg.dependencies, ...apiPkg.devDependencies };
+        if (deps["@google/genai"])
+          versions.gemini = deps["@google/genai"]
+            .replace("^", "")
+            .replace("~", "");
+      }
+
+      return versions;
+    } catch (error) {
+      console.error("Failed to read package versions:", error);
+      return {
+        next: "16",
+        react: "19",
+        tailwind: "4",
+        gemini: "Latest",
+      };
+    }
   }
 }

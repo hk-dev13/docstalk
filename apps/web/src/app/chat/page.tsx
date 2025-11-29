@@ -339,7 +339,18 @@ export default function ChatPage() {
 
         switch (event.event) {
           case "routing":
-            setRoutingMetadata(event.data as RoutingMetadata);
+            const metadata = event.data as RoutingMetadata;
+            setRoutingMetadata(metadata);
+
+            // Update assistant message with queryType for UI warning
+            setMessages((prev) => [
+              ...prev.slice(0, -1),
+              {
+                ...assistantMessage,
+                content: fullResponse, // Preserve current content
+                queryType: metadata.queryType,
+              },
+            ]);
             break;
 
           case "clarification":

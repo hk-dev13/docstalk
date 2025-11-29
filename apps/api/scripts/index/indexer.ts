@@ -3,6 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs/promises";
 import path from "path";
+import { QdrantService } from "../../src/services/qdrant.service";
+import * as crypto from "crypto";
 
 interface DocChunk {
   content: string;
@@ -89,25 +91,34 @@ async function generateEmbedding(text: string): Promise<number[]> {
 async function indexChunks(source: string, chunks: DocChunk[]) {
   console.log(`\n📊 Indexing ${chunks.length} chunks for ${source}...\n`);
 
-  // Cleanup old chunks first
-  console.log(`  🧹 Cleaning up old chunks for ${source}...`);
-  const { error: deleteError } = await supabase
-    .from("doc_chunks")
-    .delete()
-    .eq("source", source);
+  // Initialize Qdrant
+  const qdrant = new QdrantService();
+  await qdrant.ensureCollection();
 
-  if (deleteError) {
-    console.error("  ❌ Error deleting old chunks:", deleteError.message);
-    throw deleteError;
+  // Clean up old chunks for this source
+  console.log(`  🧹 Cleaning up old chunks for ${source}...`);
+  try {
+    // 1. Delete from Qdrant
+    await qdrant.deleteBySource(source);
+
+    // 2. Delete from Supabase (metadata)
+    const { error } = await supabase
+      .from("doc_chunk_meta")
+      .delete()
+      .eq("source", source);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error(`  ❌ Error deleting old chunks:`, error);
+    // Continue anyway, upsert will handle it
   }
-  console.log(`  ✅ Old chunks cleaned up.`);
 
   let successCount = 0;
   let errorCount = 0;
   let splitCount = 0;
 
   // Process in batches to avoid rate limits
-  const batchSize = 10;
+  const batchSize = 5;
 
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batch = chunks.slice(i, i + batchSize);
@@ -148,7 +159,6 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
 
           // Extract metadata fields
           const chunkIndex = chunk.metadata?.chunkIndex || 0;
-          const fullContent = chunk.metadata?.fullContent || null;
 
           // Create title with part indicator if split
           const title =
@@ -156,37 +166,61 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
               ? `${chunk.title} (Part ${subIdx + 1}/${subChunks.length})`
               : chunk.title;
 
-          // Insert into Supabase with new migration fields
-          const { error } = await supabase.from("doc_chunks").insert({
-            content: subContent,
-            url: chunk.url,
-            title: title,
-            source: chunk.source,
-            embedding: embedding,
-            metadata: {
-              ...chunk.metadata,
-              splitPart: subChunks.length > 1 ? subIdx + 1 : undefined,
-              totalParts: subChunks.length > 1 ? subChunks.length : undefined,
-            },
-            chunk_index: chunkIndex,
-            full_content: fullContent,
-          });
+          // Generate UUID for the chunk
+          const chunkId = crypto.randomUUID();
 
-          if (error) {
-            console.error(
-              `    ❌ Error inserting chunk ${globalIdx}${
-                subIdx > 0 ? `.${subIdx + 1}` : ""
-              }:`,
-              error.message
-            );
-            errorCount++;
-          } else {
-            console.log(
-              `    ✅ Indexed chunk ${globalIdx}${
-                subIdx > 0 ? `.${subIdx + 1}` : ""
-              }`
-            );
-            successCount++;
+          // 1. Upsert to Qdrant (Vector + Content)
+          await qdrant.upsertPoints([
+            {
+              id: chunkId,
+              vector: embedding,
+              payload: {
+                source: chunk.source,
+                url: chunk.url,
+                title: title,
+                content: subContent,
+                chunk_index: chunkIndex,
+                ...chunk.metadata,
+                splitPart: subChunks.length > 1 ? subIdx + 1 : undefined,
+                totalParts: subChunks.length > 1 ? subChunks.length : undefined,
+              },
+            },
+          ]);
+
+          // 2. Insert to Supabase (Metadata only)
+          let retries = 3;
+          while (retries > 0) {
+            try {
+              const { error } = await supabase.from("doc_chunk_meta").insert({
+                id: chunkId,
+                qdrant_id: chunkId,
+                url: chunk.url,
+                title: title,
+                source: chunk.source,
+                chunk_index: chunkIndex,
+              });
+
+              if (error) throw error;
+
+              console.log(
+                `    ✅ Indexed chunk ${globalIdx}${
+                  subIdx > 0 ? `.${subIdx + 1}` : ""
+                }`
+              );
+              successCount++;
+              break; // Success
+            } catch (err: any) {
+              retries--;
+              if (retries === 0) {
+                console.error(
+                  `    ❌ Error inserting metadata ${globalIdx}:`,
+                  err.message || err
+                );
+                errorCount++;
+              } else {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+              }
+            }
           }
         }
       } catch (error) {
@@ -197,7 +231,7 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
 
     await Promise.all(batchPromises);
 
-    // Rate limiting: wait between batches
+    // Rate limiting
     if (i + batchSize < chunks.length) {
       console.log(`  ⏳ Waiting 2s to avoid rate limits...\n`);
       await new Promise((resolve) => setTimeout(resolve, 2000));

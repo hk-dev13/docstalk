@@ -1,6 +1,9 @@
 -- WARNING: This schema is for context only and already exists in the database and is not meant to be run again.
 -- Table order and constraints may not be valid for execution.
 
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
 CREATE TABLE public.context_switches (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   conversation_id uuid NOT NULL,
@@ -21,24 +24,22 @@ CREATE TABLE public.conversations (
   doc_source text,
   created_at timestamp without time zone DEFAULT now(),
   updated_at timestamp without time zone DEFAULT now(),
+  is_pinned boolean DEFAULT false,
   CONSTRAINT conversations_pkey PRIMARY KEY (id),
   CONSTRAINT conversations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
   CONSTRAINT conversations_doc_source_fkey FOREIGN KEY (doc_source) REFERENCES public.doc_sources(id)
 );
-CREATE TABLE public.doc_chunks (
+CREATE TABLE public.doc_chunk_meta (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  content text NOT NULL,
   url text NOT NULL,
   title text,
   source text NOT NULL,
-  embedding USER-DEFINED,
-  metadata jsonb,
   created_at timestamp without time zone DEFAULT now(),
   updated_at timestamp without time zone DEFAULT now(),
   parent_id uuid,
   chunk_index integer DEFAULT 0,
-  full_content text,
-  CONSTRAINT doc_chunks_pkey PRIMARY KEY (id)
+  qdrant_id uuid,
+  CONSTRAINT doc_chunk_meta_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.doc_sources (
   id text NOT NULL,

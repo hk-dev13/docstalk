@@ -1,6 +1,6 @@
 {
   "name": "@docstalk/api",
-  "version": "0.2.0-beta.1",
+  "version": "0.2.0-beta.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "@fastify/rate-limit": "^10.3.0",
     "@google-cloud/discoveryengine": "^2.5.2",
     "@google/genai": "^1.30.0",
+    "@qdrant/qdrant-js": "^1.16.1",
     "@supabase/supabase-js": "^2.86.0",
     "cheerio": "^1.1.2",
     "dotenv": "^16.6.1",

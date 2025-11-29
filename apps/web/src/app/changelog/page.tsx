@@ -8,7 +8,7 @@ import { Calendar, Tag, GitCommit } from "lucide-react";
 export default function ChangelogPage() {
   const changes = [
     {
-      version: "v0.2.0-beta.2",
+      version: "v0.2.0-beta.3",
       date: "November 29, 2024",
       title: "UI Polish & Pin Message",
       type: "improvement",

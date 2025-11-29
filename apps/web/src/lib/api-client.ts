@@ -12,6 +12,7 @@ export interface ChatMessage {
   }>;
   isStreaming?: boolean;
   reasoning?: string; // For AI reasoning display
+  queryType?: "meta" | "specific" | "ambiguous"; // For UI warnings
 }
 
 // Auto-detect types

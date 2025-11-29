@@ -363,6 +363,17 @@ export async function registerAutoDetectRoutes(
 
       // Handle general queries (fallback agent)
       if (routingDecision.queryType === "general") {
+        // Send routing metadata first so frontend knows to show alert
+        reply.raw.write(
+          `event: routing\ndata: ${JSON.stringify({
+            queryType: "meta", // Use "meta" to trigger the alert in frontend
+            detectedSource: "general",
+            confidence: routingDecision.confidence,
+            wasAutoDetected: true,
+            reasoning: routingDecision.reasoning,
+          })}\n\n`
+        );
+
         for await (const chunk of ragService.generateGeneralAnswerStream(
           query,
           conversationHistory,

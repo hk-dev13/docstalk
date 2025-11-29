@@ -35,6 +35,7 @@ export { GridPattern } from "./grid-pattern";
 export { BackToTop } from "./back-to-top";
 export * from "./skeleton";
 export * from "./animated-logo";
+export { Alert, AlertTitle, AlertDescription } from "./alert";
 export { Typewriter } from "./typewriter";
 export { LiquidText } from "./liquid-text";
 export { ModeToggle } from "./mode-toggle";

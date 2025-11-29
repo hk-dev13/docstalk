@@ -41,6 +41,55 @@ const DOC_CONFIGS = {
     urlPattern: /^https:\/\/www\.typescriptlang\.org\/docs/,
     maxPages: 200,
   },
+  nodejs: {
+    name: "Node.js",
+    baseUrl: "https://nodejs.org",
+    startUrls: ["https://nodejs.org/docs/latest/api/"],
+    urlPattern: /^https:\/\/nodejs\.org\/docs\/latest\/api/,
+    maxPages: 200,
+  },
+  tailwind: {
+    name: "Tailwind CSS",
+    baseUrl: "https://tailwindcss.com",
+    startUrls: ["https://tailwindcss.com/docs"],
+    urlPattern: /^https:\/\/tailwindcss\.com\/docs/,
+    maxPages: 200,
+  },
+  prisma: {
+    name: "Prisma",
+    baseUrl: "https://www.prisma.io",
+    startUrls: ["https://www.prisma.io/docs"],
+    urlPattern: /^https:\/\/www\.prisma\.io\/docs/,
+    maxPages: 200,
+  },
+  express: {
+    name: "Express",
+    baseUrl: "https://expressjs.com",
+    startUrls: ["https://expressjs.com/en/starter/installing.html"],
+    urlPattern: /^https:\/\/expressjs\.com\/en/,
+    maxPages: 100,
+  },
+  python: {
+    name: "Python",
+    baseUrl: "https://docs.python.org/3/",
+    startUrls: ["https://docs.python.org/3/tutorial/index.html"],
+    urlPattern: /^https:\/\/docs\.python\.org\/3/,
+    maxPages: 200,
+  },
+  rust: {
+    name: "Rust",
+    baseUrl: "https://doc.rust-lang.org",
+    startUrls: ["https://doc.rust-lang.org/book/"],
+    urlPattern: /^https:\/\/doc\.rust-lang\.org\/book/,
+    maxPages: 200,
+  },
+  go: {
+    name: "Go",
+    baseUrl: "https://go.dev",
+    startUrls: ["https://go.dev/doc/"],
+    urlPattern: /^https:\/\/go\.dev\/doc/,
+    maxPages: 200,
+  },
 };
 
 /**
@@ -303,8 +352,7 @@ async function crawlDocumentation(
             section: title,
             chunkIndex: index,
             totalChunks: chunks.length,
-            // Store full content only for first chunk to save space
-            fullContent: index === 0 ? content : undefined,
+            // fullContent removed to save DB space (3GB limit reached)
           },
         });
       });

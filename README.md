@@ -1,41 +1,75 @@
-# DocsTalk 🚀
-
-> AI-powered documentation assistant for developers. Get instant, accurate answers from official docs using RAG (Retrieval-Augmented Generation).
-
 <div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DocsTalk](https://img.shields.io/badge/✨%20DocsTalk-Smart%20Assistant-7C3AED?style=flat)](https://docstalk.envoyou.com) <br>
-[![Next.js](https://img.shields.io/badge/Next.js-16.0.3-black?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19-blue?style=flat&logo=react&logoColor=white)](https://react.dev/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Powered by Gemini](https://img.shields.io/badge/Powered%20by-Gemini%20AI-8E75B2?style=flat&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
+# DocsTalk  
+**Connect your LLM to living, official docs.  
+Stop trusting stale answers.**
+
+---
+
+### Tech Stack
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-000000?style=flat&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-000000?style=flat&logo=tailwind-css&logoColor=38B2AC)](https://tailwindcss.com/)
+
+### Integrations
+[![Gemini](https://img.shields.io/badge/Gemini_AI-000000?style=flat&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Clerk](https://img.shields.io/badge/Clerk_Auth-000000?style=flat&logo=clerk&logoColor=white)](https://clerk.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase_DB-000000?style=flat&logo=supabase&logoColor=3ECF8E)](https://supabase.com/)
+[![Qdrant](https://img.shields.io/badge/Qdrant_VectorDB-000000?style=flat&logo=qdrant&logoColor=white)](https://qdrant.tech/)
+
+### Project
+[![DocsTalk](https://img.shields.io/badge/DocsTalk-Smart_Assistant-000000?style=flat)](https://docstalk.envoyou.com)
+[![MIT License](https://img.shields.io/badge/License-MIT-000000?style=flat)](https://opensource.org/licenses/MIT)
+
+<br />
+
+**AI-powered documentation assistant for developers.  
+Get instant, accurate answers from official docs using RAG.**
 
 </div>
 
-## ✨ Features
+## 🏗️ Hybrid Architecture
 
-- 🤖 **Smart RAG System** - Vector similarity search with Gemini
-- 🧠 **Real Reasoning** - View the AI's step-by-step thought process before the answer
-- 📚 **Multi-Source** - Supports Next.js, React, TypeScript docs (extensible)
-- 🔄 **Version-Aware** - Intelligently handles documentation from multiple versions
-- ⚡ **Streaming Responses** - Real-time answer generation with "Thinking" UI
-- 🗣️ **Text-to-Speech** - Listen to answers with stop/cancel control
-- 💬 **Conversation History** - Context-aware follow-up questions
-- 🎯 **Response Modes** - 7 different response styles (Friendly, Formal, Tutorial, etc.)
-- 💻 **CLI Tool** - Manage scraping, indexing, and chat from the terminal
-- 🌓 **Dark/Light Mode** - Beautiful UI with theme toggle
-- 🔒 **Auth & Usage Limits** - Clerk authentication with rate limiting
+DocsTalk now uses a **Hybrid Architecture** for maximum scalability and performance:
 
-## 🚀 Quick Start
+- **Supabase (PostgreSQL)**: Acts as the **System of Record**. Stores user data, chat history, and documentation metadata (ID, URL, Title).
+- **Qdrant (Vector DB)**: Acts as the **Semantic Engine**. Stores high-dimensional vectors and full content payloads for lightning-fast retrieval.
+
+## ✨ Key Features
+
+- **Smart Auto-Detection**: Automatically identifies which documentation you're asking about.
+- **Hybrid Search**: Combines keyword matching with semantic vector search.
+- **Multi-Source Support**: Node.js, React, Next.js, TypeScript, Tailwind, Python, Go, Rust, and more.
+- **CLI Auto-Indexing**: Scrape and index in one go: `docstalk scrape <source> --index`.
+- **RAG Powered**: Uses Google Gemini 1.5 Flash for accurate, context-aware answers.
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
-- pnpm 8+
-- Supabase account
-- Google Gemini API key
+- Node.js 18+
+- pnpm
+- Supabase Project
+- Qdrant Instance (Cloud or Docker)
+- Google Gemini API Key
 - Clerk account
+
+### Environment Setup
+
+Create `.env` files in `apps/web` and `apps/api` (see `.env.example`).
+
+**Required for API:**
+
+```env
+# Database
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+QDRANT_URL=...
+QDRANT_API_KEY=...
+
+# AI
+GEMINI_API_KEY=...
+```
 
 ### Installation
 
@@ -68,10 +102,11 @@ cd apps/cli
 pnpm link --global
 
 # Usage
-docstalk scrape <source>   # Scrape documentation
-docstalk index <source>    # Index documentation
-docstalk ask "question"    # Ask a question from terminal
-docstalk serve             # Start the API server
+docstalk scrape <source>         # Scrape documentation
+docstalk index <source>          # Index documentation
+docstalk scrape <source> --index # Scrape and index in one go
+docstalk ask "question"          # Ask a question from terminal
+docstalk serve                   # Start API server
 ```
 
 ### Environment Setup
@@ -92,6 +127,8 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 GEMINI_API_KEY=your_gemini_key
 CLERK_SECRET_KEY=your_clerk_secret
+QDRANT_URL=...
+QDRANT_API_KEY=...
 ```
 
 ## 📁 Monorepo Structure
@@ -179,6 +216,7 @@ docs_talk/
 - **Gemini text-embedding-004** - Vector embeddings
 - **Supabase** - PostgreSQL with pgvector
 - **Clerk** - Auth verification
+- **Qdrant** - Vector database
 
 ### DevOps
 
@@ -258,8 +296,9 @@ pnpm index <source>   # Index docs
 2. **Chunking** - Smart text splitting with overlap (auto-split for large chunks)
 3. **Embedding** - Generate vectors using Gemini text-embedding-004
 4. **Storage** - Store in Supabase with pgvector
-5. **Retrieval** - Hybrid search (similarity + keyword + version-aware)
-6. **Generation** - Context-aware answers with Gemini 2.5 Flash
+5. **Qdrant** - Store in Qdrant vector database
+6. **Retrieval** - Hybrid search (similarity + keyword + version-aware)
+7. **Generation** - Context-aware answers with Gemini 2.5 Flash
 
 ### Key Features
 
@@ -282,7 +321,7 @@ pnpm index <source>   # Index docs
 
 ## 📊 Database Schema
 
-See [docs/database/supabase-schema.sql](docs/database/supabase-schema.sql)
+See [docs/database/schema_docstalk.sql](docs/database/schema_docstalk.sql)
 
 Key tables:
 
@@ -290,8 +329,10 @@ Key tables:
 - `user_usage` - Usage tracking & limits
 - `conversations` - Chat conversations
 - `messages` - Chat history
-- `doc_chunks` - Documentation chunks with embeddings
+- `doc_chunk_meta` - Documentation chunks with embeddings
 - `doc_sources` - Documentation source metadata
+- `context_switches` - Context switching history
+- `usage` - Usage tracking & limits
 
 ## 🤝 Contributing
 
@@ -314,7 +355,14 @@ MIT License - see [LICENSE](LICENSE) file for details
 - Next.js team for amazing documentation
 - Google Gemini for powerful AI capabilities
 - Supabase for excellent PostgreSQL + pgvector
+- Clerk for authentication
+- Qdrant for vector database
 - Shadcn for beautiful UI components
+- Puppeteer for web scraping
+- Commander.js for CLI
+- TypeScript for type safety
+- ESLint for code quality
+- Prettier for code formatting
 
 ---
 

@@ -35,15 +35,24 @@ program
   .command("scrape")
   .description("Scrape documentation from a URL")
   .argument("<url>", "URL to scrape")
-  .action(async (url) => {
+  .option("-i, --index", "Automatically index after scraping")
+  .action(async (url, options) => {
     console.log(chalk.blue(`🕷️  Scraping ${url}...`));
     try {
       await execa("pnpm", ["--filter", "@docstalk/api", "scrape", url], {
         cwd: projectRoot,
         stdio: "inherit",
       });
+
+      if (options.index) {
+        console.log(chalk.blue(`\n📊 Auto-indexing ${url}...`));
+        await execa("pnpm", ["--filter", "@docstalk/api", "index", url], {
+          cwd: projectRoot,
+          stdio: "inherit",
+        });
+      }
     } catch (error) {
-      console.error(chalk.red("❌ Scraping failed"));
+      console.error(chalk.red("❌ Scraping or indexing failed"));
       process.exit(1);
     }
   });

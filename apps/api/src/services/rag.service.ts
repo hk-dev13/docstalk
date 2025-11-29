@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { QdrantService } from "./qdrant.service";
 
 interface SearchResult {
   id: string;
@@ -434,7 +435,7 @@ Reformulated query:`;
   }
 
   /**
-   * Search documentation using vector similarity with enhanced context
+   * Search documentation using Qdrant (Vector + Payload)
    */
   async searchDocumentation(
     query: string,
@@ -444,39 +445,24 @@ Reformulated query:`;
     // Generate query embedding
     const queryEmbedding = await this.generateEmbedding(query);
 
-    // Use new search_docs_with_context RPC function with LOWER threshold
-    const { data, error } = await this.supabase.rpc(
-      "search_docs_with_context",
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.65, // Lowered from 0.7 for better recall
-        match_count: limit * 2, // Get more candidates for quality filtering
-        filter_source: source || null,
-        include_context: true,
-      }
-    );
+    // Search Qdrant
+    const qdrant = new QdrantService();
+    const results = await qdrant.search(queryEmbedding, limit * 2, source);
 
-    if (error) {
-      // Fallback to old search_docs if migration not applied yet
-      console.warn(
-        "search_docs_with_context not available, falling back to search_docs"
-      );
-      const { data: fallbackData, error: fallbackError } =
-        await this.supabase.rpc("search_docs", {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.65,
-          match_count: limit * 2,
-          filter_source: source || null,
-        });
+    // Map Qdrant results to SearchResult
+    const searchResults: SearchResult[] = results.map((res) => ({
+      id: res.id as string,
+      content: res.payload?.content as string,
+      url: res.payload?.url as string,
+      title: res.payload?.title as string,
+      source: res.payload?.source as string,
+      similarity: res.score,
+      chunk_index: res.payload?.chunk_index as number,
+      full_content: undefined, // Not used anymore
+      metadata: (res.payload as Record<string, any>) || undefined,
+    }));
 
-      if (fallbackError) {
-        throw new Error(`Search error: ${fallbackError.message}`);
-      }
-
-      return this.filterQualityChunks(fallbackData || [], limit);
-    }
-
-    return this.filterQualityChunks(data || [], limit);
+    return this.filterQualityChunks(searchResults, limit);
   }
 
   /**
@@ -524,96 +510,13 @@ Reformulated query:`;
   }
 
   /**
-   * Get expanded context by retrieving surrounding chunks
-   * Uses new chunk_index field from migration
+   * Get expanded context (Not implemented for Qdrant yet, returning original chunks)
+   * TODO: Implement window retrieval in Qdrant if needed
    */
   private async getExpandedContext(
     chunks: SearchResult[]
   ): Promise<SearchResult[]> {
-    if (chunks.length === 0) return [];
-
-    const expandedChunks: SearchResult[] = [];
-    const seenUrls = new Set<string>();
-
-    // Prepare all query parameters
-    const chunkRequests = chunks.map((chunk) => ({
-      url: chunk.url,
-      chunkIndex: chunk.chunk_index ?? chunk.metadata?.chunkIndex ?? 0,
-      originalChunk: chunk,
-    }));
-
-    // Build OR conditions for all chunks in a single query
-    let query = this.supabase
-      .from("doc_chunks")
-      .select(
-        "id, content, url, title, source, chunk_index, full_content, metadata"
-      );
-
-    // Add OR conditions for each chunk's surrounding range
-    for (const req of chunkRequests) {
-      query = query.or(
-        `and(url.eq.${req.url},chunk_index.gte.${Math.max(
-          0,
-          req.chunkIndex - 1
-        )},chunk_index.lte.${req.chunkIndex + 1})`
-      );
-    }
-
-    const { data: allSurroundingChunks } = await query
-      .order("url")
-      .order("chunk_index", { ascending: true });
-
-    if (!allSurroundingChunks) {
-      return chunks; // Fallback to original chunks
-    }
-
-    // Group surrounding chunks by URL and chunk index
-    const chunksByUrl = new Map<string, any[]>();
-    for (const sc of allSurroundingChunks) {
-      const key = sc.url;
-      if (!chunksByUrl.has(key)) {
-        chunksByUrl.set(key, []);
-      }
-      chunksByUrl.get(key)!.push(sc);
-    }
-
-    // Process each original chunk with its surrounding chunks
-    for (const req of chunkRequests) {
-      const surroundingChunks = chunksByUrl.get(req.url) || [];
-
-      // Filter to chunks in the range for this specific chunk
-      const relevantChunks = surroundingChunks.filter(
-        (sc) =>
-          sc.chunk_index >= Math.max(0, req.chunkIndex - 1) &&
-          sc.chunk_index <= req.chunkIndex + 1
-      );
-
-      if (relevantChunks.length > 0) {
-        // Combine chunks for this URL
-        const combinedContent = relevantChunks
-          .map((c) => c.content)
-          .join("\n\n");
-
-        // Add unique expanded chunk
-        const urlKey = `${req.url}-${req.chunkIndex}`;
-        if (!seenUrls.has(urlKey)) {
-          expandedChunks.push({
-            ...req.originalChunk,
-            content: combinedContent,
-            id: urlKey,
-            // Include full_content if available from first chunk
-            full_content:
-              relevantChunks[0]?.full_content || req.originalChunk.full_content,
-          });
-          seenUrls.add(urlKey);
-        }
-      } else {
-        // Fallback to original chunk
-        expandedChunks.push(req.originalChunk);
-      }
-    }
-
-    return expandedChunks;
+    return chunks;
   }
 
   /**
@@ -1210,9 +1113,7 @@ Response:
 **Instructions:**
 1. Answer the question using your general knowledge.
 2. Be helpful and accurate.
-3. IMPORTANT: Start your response with a disclaimer that this topic is not covered in the official documentation.
-   - English: "Note: This topic is not covered in the official documentation, but here is a general answer:"
-   - Indonesian: "Catatan: Topik ini tidak tercakup dalam dokumentasi resmi, namun berikut adalah jawaban umum:"
+3. IMPORTANT: Do NOT include any disclaimer about the topic not being in the documentation. The frontend will handle the warning.
 4. Respect the user's language (Indonesian/English).
 ${style}
 

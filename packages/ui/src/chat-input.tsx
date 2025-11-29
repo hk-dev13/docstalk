@@ -134,7 +134,7 @@ export function ChatInput({
         </div>
 
         <p className="text-[10px] text-muted-foreground text-center mt-3 opacity-60">
-          DocsTalk Smart Documentation Assistant • Powered by Gemini
+          DocsTalk surfaces docs but might be out of date — check timestamp & source.
         </p>
       </div>
     </div>

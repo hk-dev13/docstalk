@@ -24,6 +24,9 @@ import { Button } from "./button";
 
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "./alert";
+import { Info } from "lucide-react";
+
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
@@ -31,6 +34,7 @@ interface ChatMessageProps {
   isStreaming?: boolean;
   onRegenerate?: () => void;
   reasoning?: string;
+  queryType?: "meta" | "specific" | "ambiguous";
 }
 
 export function ChatMessage({
@@ -40,6 +44,7 @@ export function ChatMessage({
   isStreaming,
   onRegenerate,
   reasoning,
+  queryType,
 }: ChatMessageProps) {
   const isUser = role === "user";
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
@@ -154,8 +159,24 @@ export function ChatMessage({
 
   return (
     <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"} mb-6 group`}
+      className={`flex flex-col ${
+        isUser ? "items-end" : "items-start"
+      } mb-6 group`}
     >
+      {/* Alert for General Queries */}
+      {role === "assistant" && queryType === "meta" && !isThinking && (
+        <div className="mb-3 max-w-[85%] animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Alert variant="warning" className="shadow-sm">
+            <Info className="h-4 w-4" />
+            <AlertTitle>General Knowledge</AlertTitle>
+            <AlertDescription>
+              This topic is not covered in the official documentation. The
+              answer below is based on general knowledge.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       <div
         className={`flex gap-4 max-w-[85%] ${
           isUser ? "flex-row-reverse" : "flex-row"
@@ -446,7 +467,7 @@ export function ChatMessage({
                           <div className="border-t border-white/10 p-2 bg-white/5">
                             <div className="flex items-center gap-2 text-xs text-gray-400 px-2">
                               <Sparkles className="h-3 w-3 text-indigo-400" />
-                              <span>Model: Gemini 2.5 Flash</span>
+                              <span>Model: Beta</span>
                             </div>
                           </div>
                         </div>
