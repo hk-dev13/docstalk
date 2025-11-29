@@ -41,7 +41,7 @@ DocsTalk now uses a **Hybrid Architecture** for maximum scalability and performa
 - **Hybrid Search**: Combines keyword matching with semantic vector search.
 - **Multi-Source Support**: Node.js, React, Next.js, TypeScript, Tailwind, Python, Go, Rust, and more.
 - **CLI Auto-Indexing**: Scrape and index in one go: `docstalk scrape <source> --index`.
-- **RAG Powered**: Uses Google Gemini 1.5 Flash for accurate, context-aware answers.
+- **RAG Powered**: Uses Google Gemini 2.5 Flash for accurate, context-aware answers.
 
 ## 🚀 Getting Started
 
