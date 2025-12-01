@@ -1,23 +1,27 @@
 <div align="center">
 
-# DocsTalk  
+# DocsTalk
+
 **Connect your LLM to living, official docs.  
 Stop trusting stale answers.**
 
 ---
 
 ### Tech Stack
+
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-000000?style=flat&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-000000?style=flat&logo=tailwind-css&logoColor=38B2AC)](https://tailwindcss.com/)
 
 ### Integrations
+
 [![Gemini](https://img.shields.io/badge/Gemini_AI-000000?style=flat&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
 [![Clerk](https://img.shields.io/badge/Clerk_Auth-000000?style=flat&logo=clerk&logoColor=white)](https://clerk.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase_DB-000000?style=flat&logo=supabase&logoColor=3ECF8E)](https://supabase.com/)
 [![Qdrant](https://img.shields.io/badge/Qdrant_VectorDB-000000?style=flat&logo=qdrant&logoColor=white)](https://qdrant.tech/)
 
 ### Project
+
 [![DocsTalk](https://img.shields.io/badge/DocsTalk-Smart_Assistant-000000?style=flat)](https://docstalk.envoyou.com)
 [![MIT License](https://img.shields.io/badge/License-MIT-000000?style=flat)](https://opensource.org/licenses/MIT)
 

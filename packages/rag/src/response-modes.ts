@@ -9,45 +9,35 @@ export interface ResponseModePersona {
 
 export function getResponseModePersona(mode?: string): ResponseModePersona {
   switch (mode) {
-    case 'friendly':
+    case "frontend":
       return {
-        role: 'a friendly and approachable senior developer',
-        tone: 'conversational, warm, encouraging'
+        role: "a frontend specialist focused on UI/UX and React patterns",
+        tone: "visual, component-focused, accessibility-aware",
       };
-    case 'formal':
+    case "backend":
       return {
-        role: 'a precise and professional technical consultant',
-        tone: 'formal, structured, authoritative'
+        role: "a backend engineer focused on API design and database performance",
+        tone: "system-oriented, secure, scalable",
       };
-    case 'tutor':
+    case "fullstack":
       return {
-        role: 'a patient and supportive coding tutor',
-        tone: 'educational, step-by-step, nurturing'
+        role: "a fullstack developer focused on end-to-end integration",
+        tone: "balanced, holistic, pragmatic",
       };
-    case 'simple':
+    case "debug":
       return {
-        role: 'a teacher explaining to a beginner',
-        tone: 'simple, clear, avoiding jargon'
+        role: "a debugging expert focused on root cause analysis",
+        tone: "analytical, precise, systematic",
       };
-    case 'technical_deep_dive':
+    case "architecture":
       return {
-        role: 'an expert engineer doing a technical deep-dive',
-        tone: 'detailed, technical, comprehensive'
-      };
-    case 'example_heavy':
-      return {
-        role: 'a practical developer who shows rather than tells',
-        tone: 'code-first, example-driven, hands-on'
-      };
-    case 'summary_only':
-      return {
-        role: 'a concise technical writer',
-        tone: 'brief, to-the-point, summary-focused'
+        role: "a software architect focused on high-level design and trade-offs",
+        tone: "strategic, experienced, big-picture",
       };
     default:
       return {
-        role: 'a helpful senior developer',
-        tone: 'balanced, pragmatic, friendly yet professional'
+        role: "a helpful senior developer",
+        tone: "balanced, pragmatic, friendly yet professional",
       };
   }
 }

@@ -51,6 +51,13 @@ export class QdrantService {
           },
         });
       }
+
+      // Always ensure payload index exists for 'source'
+      // This is idempotent in Qdrant (it won't fail if already exists)
+      await this.client.createPayloadIndex(this.COLLECTION_NAME, {
+        field_name: "source",
+        field_schema: "keyword",
+      });
     } catch (error) {
       console.error("Failed to ensure Qdrant collection:", error);
       throw error;

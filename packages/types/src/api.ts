@@ -1,3 +1,5 @@
+import { ResponseMode } from "./enums";
+
 /**
  * API Request/Response Types
  */
@@ -8,7 +10,7 @@ export interface ChatStreamRequest {
   userId: string;
   userEmail: string;
   conversationHistory?: Array<{ role: string; content: string }>;
-  responseMode?: string;
+  responseMode?: ResponseMode;
 }
 
 export interface UsageStatsResponse {
@@ -38,13 +40,13 @@ export interface Conversation {
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   created_at: string;
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
 }

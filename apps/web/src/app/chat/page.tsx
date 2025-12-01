@@ -49,8 +49,7 @@ export default function ChatPage() {
   const { user } = useUser();
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedSource, setSelectedSource] = useState<string>("nextjs");
-  const [responseMode, setResponseMode] = useState<string>("friendly");
+  const [responseMode, setResponseMode] = useState<string>("auto");
   const [usage, setUsage] = useState<{ count: number; limit: number }>({
     count: 0,
     limit: 30,
@@ -231,10 +230,7 @@ export default function ChatPage() {
 
   const handleSendMessage = async (query: string) => {
     // Unified entry point: delegates to handleAutoDetectSend
-    // If selectedSource is "auto", forcedSource is undefined
-    // If selectedSource is specific (e.g. "nextjs"), it becomes forcedSource
-    const forcedSource = selectedSource === "auto" ? undefined : selectedSource;
-    await handleAutoDetectSend(query, forcedSource);
+    await handleAutoDetectSend(query);
   };
   // Unified message handler for both Auto and Manual modes
   const handleAutoDetectSend = async (
@@ -316,12 +312,8 @@ export default function ChatPage() {
       let fullResponse = "";
       let thinkingContent = "";
 
-      // Determine source to use: forcedSource takes precedence, otherwise check selectedSource
-      // If selectedSource is "auto", pass undefined to let backend detect
-      // If selectedSource is specific (e.g. "nextjs"), pass it as forcedSource
-      const sourceToUse =
-        forcedSource ||
-        (selectedSource === "auto" ? undefined : selectedSource);
+      // Determine source to use: forcedSource takes precedence
+      const sourceToUse = forcedSource;
 
       // Stream with auto-detect API (used for both auto and manual)
       console.log("[Unified Handler] Starting stream:", { query, sourceToUse });
@@ -382,31 +374,11 @@ export default function ChatPage() {
             const chunk = (event.data as { chunk: string }).chunk;
             fullResponse += chunk;
 
-            // Parse thinking tags
-            const thinkingMatch = fullResponse.match(
-              /<thinking>([\s\S]*?)<\/thinking>/
-            );
-            if (thinkingMatch) {
-              thinkingContent = thinkingMatch[1].trim();
-            } else if (
-              fullResponse.includes("<thinking>") &&
-              !fullResponse.includes("</thinking>")
-            ) {
-              const start = fullResponse.indexOf("<thinking>") + 10;
-              thinkingContent = fullResponse.slice(start).trim();
-            }
-
-            // Clean content
-            const cleanContent = fullResponse
-              .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
-              .trim();
-
             setMessages((prev) => [
               ...prev.slice(0, -1),
               {
                 ...assistantMessage,
-                content: cleanContent,
-                reasoning: thinkingContent,
+                content: fullResponse.trim(),
               },
             ]);
             break;
@@ -679,8 +651,6 @@ export default function ChatPage() {
           <ChatInput
             onSend={handleSendMessage}
             disabled={isStreaming || usage.count >= usage.limit}
-            selectedSource={selectedSource}
-            onSelectedSourceChange={setSelectedSource}
             responseMode={responseMode}
             onResponseModeChange={setResponseMode}
           />

@@ -13,17 +13,16 @@ import type {
 
 /**
  * RouterService - AI Router for automatic doc source detection
- *
- * Responsibilities:
- * 1. Detect query type (meta, specific, ambiguous)
- * 2. Route to appropriate doc source or handle meta queries
- * 3. Track session memory (context switches)
- * 4. Generate clarification prompts when needed
+ * NOW 100% DYNAMIC & DATABASE DRIVEN
  */
 export class RouterService {
   private client: GoogleGenAI;
   private supabase: SupabaseClient;
   private config: RouterConfig;
+
+  // Cache sederhana untuk menghindari spam request ke DB saat mengambil instructions
+  private sourceCache: Map<string, DocSourceMetadata> = new Map();
+  private lastCacheTime: number = 0;
 
   constructor(supabase: SupabaseClient, config?: Partial<RouterConfig>) {
     this.client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -36,9 +35,15 @@ export class RouterService {
   }
 
   /**
-   * Get available doc sources from database
+   * Get available doc sources from database (with Caching)
    */
   async getAvailableDocSources(): Promise<DocSourceMetadata[]> {
+    // Refresh cache every 5 minutes
+    const now = Date.now();
+    if (this.sourceCache.size > 0 && now - this.lastCacheTime < 300000) {
+      return Array.from(this.sourceCache.values());
+    }
+
     const { data, error } = await this.supabase.rpc(
       "get_available_doc_sources"
     );
@@ -48,15 +53,22 @@ export class RouterService {
       return [];
     }
 
-    return (data || []).map((ds: any) => ({
+    const sources = (data || []).map((ds: any) => ({
       id: ds.id,
       name: ds.name,
       description: ds.description,
-      keywords: ds.keywords,
+      keywords: ds.keywords || [],
       isActive: true,
       iconUrl: ds.icon_url,
       officialUrl: ds.official_url,
     }));
+
+    // Update Cache
+    this.sourceCache.clear();
+    sources.forEach((s: DocSourceMetadata) => this.sourceCache.set(s.id, s));
+    this.lastCacheTime = now;
+
+    return sources;
   }
 
   /**
@@ -129,16 +141,13 @@ export class RouterService {
     conversationId?: string
   ): Promise<RoutingDecision> {
     try {
-      // Get available doc sources
       const availableDocSources = await this.getAvailableDocSources();
 
-      // Get session context if conversationId provided
       let sessionContext: SessionContext | null = null;
       if (conversationId) {
         sessionContext = await this.getSessionContext(conversationId);
       }
 
-      // Build detection prompt
       const prompt = this.buildDetectionPrompt(
         query,
         availableDocSources,
@@ -146,12 +155,11 @@ export class RouterService {
         sessionContext
       );
 
-      // Call Gemini for structured detection
       const result = await this.client.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
         config: {
-          temperature: 0.1, // Low temperature for consistent routing
+          temperature: 0.1,
           responseMimeType: "application/json",
         },
       });
@@ -162,7 +170,6 @@ export class RouterService {
       return this.parseDetectionResponse(detection);
     } catch (error) {
       console.error("Error in context detection:", error);
-      // Fallback to ambiguous with all sources
       const allSources = await this.getAvailableDocSources();
       return {
         queryType: "ambiguous",
@@ -174,9 +181,6 @@ export class RouterService {
     }
   }
 
-  /**
-   * Build detection prompt with session context awareness
-   */
   private buildDetectionPrompt(
     query: string,
     docSources: DocSourceMetadata[],
@@ -194,79 +198,58 @@ export class RouterService {
       sessionContext && sessionContext.switchCount > 0
         ? `\n\nSession Context:\nUser has switched contexts ${
             sessionContext.switchCount
-          } time(s) in this conversation:\n${sessionContext.contextHistory
-            .map(
-              (cs: ContextSwitch, i: number) =>
-                `${i + 1}. ${cs.fromSource || "start"} → ${
-                  cs.toSource
-                }: "${cs.query.substring(0, 50)}..."`
-            )
-            .join("\n")}\n\nCurrent context: ${
-            sessionContext.currentSource
-          }\nPrevious context: ${
+          } times. Current: ${sessionContext.currentSource}. Previous: ${
             sessionContext.previousSource
-          }\n\n**IMPORTANT:** Don't assume the query is about "${
-            sessionContext.currentSource
-          }" just because it was the previous context. Analyze the query independently.`
+          }. Analyze query independently.`
         : "\n\nThis is the first query in the conversation.";
 
-    return `You are a routing AI for DocsTalk, a documentation Q&A platform.
+    // Dynamically list all sources from DB
+    const sourcesList = docSources
+      .map(
+        (ds) =>
+          `     - ID: "${ds.id}" (${ds.name})\n       Desc: ${
+            ds.description
+          }\n       Keywords: ${ds.keywords.slice(0, 6).join(", ")}`
+      )
+      .join("\n");
 
-Analyze the following user query and determine the query type:
+    return `You are a routing AI for DocsTalk.
+Analyze the user query and determine the query type.
 
 **Current Query:** "${query}"
 ${historyText}
 ${sessionText}
 
 **Query Types:**
-1. **meta**: Questions about DocsTalk platform itself
-   - Examples: "What is DocsTalk?", "How many docs do you have?", "What can you help me with?", "What documentation sources are available?", "ini aplikasi apa?", "apa itu docstalk?", "bisa bantu apa?"
-   
-2. **specific**: Questions about specific documentation sources
-   - Available sources:
-${docSources
-  .map(
-    (ds) =>
-      `     - ${ds.id}: ${ds.name} - ${
-        ds.description
-      }\n       Keywords: ${ds.keywords.slice(0, 5).join(", ")}`
-  )
-  .join("\n")}
+1. **meta**: Questions about DocsTalk platform itself (capabilities, tech stack, "what is this app?").
+2. **specific**: Questions about specific documentation sources below.
+3. **ambiguous**: Query implies docs but unclear which one (or matches multiple).
+4. **general**: Questions unrelated to docs or coding (e.g. "Create a poem", "General knowledge").
 
-3. **ambiguous**: Query could refer to multiple sources or unclear
+**Available Documentation Sources:**
+${sourcesList}
 
-4. **general**: Questions NOT related to the available documentation sources
-   - Examples: "How do I make a sandwich?", "Who is the president?", "Write a poem", "General programming questions without specific context"
-
-**Detection Guidelines:**
-- If query is about DocsTalk platform → queryType: "meta"
-- If query clearly mentions keywords from ONE doc source → queryType: "specific", set primarySource, confidence: 85-100
-- If query mentions keywords from MULTIPLE sources → queryType: "specific", set additionalSources
-- If keywords match but unclear which source → queryType: "ambiguous", suggest possible sources
-- If query is completely unrelated to docs or platform → queryType: "general"
-- For general programming questions without specific framework mentions → queryType: "ambiguous" (prefer ambiguous if it *could* be related)
+**Detection Logic:**
+- If query matches keywords of ONE source -> queryType: "specific", set primarySource.
+- If query matches MULTIPLE sources -> queryType: "specific", set additionalSources.
+- If completely unrelated -> queryType: "general".
+- If asking about the App/DocsTalk -> queryType: "meta".
 
 **Respond with JSON:**
 {
   "queryType": "meta|specific|ambiguous|general",
-  "primarySource": "nextjs",
-  "additionalSources": ["react"],
-  "confidence": 85,
-  "reasoning": "Explain your decision briefly",
-  "suggestedSources": ["nextjs", "react"]
+  "primarySource": "id_string",
+  "additionalSources": ["id_string"],
+  "confidence": 0-100,
+  "reasoning": "brief explanation",
+  "suggestedSources": ["id_string"]
 }`;
   }
 
-  /**
-   * Parse and validate detection response
-   */
   private parseDetectionResponse(detection: any): RoutingDecision {
     const queryType = detection.queryType || "ambiguous";
     const confidence = Math.min(100, Math.max(0, detection.confidence || 0));
 
-    // Smart Multi-Source Handling:
-    // If ambiguous but we have suggestions (<= 3), treat as specific multi-source query
-    // This avoids the clarification popup and gives a better UX
     if (
       queryType === "ambiguous" &&
       detection.suggestedSources &&
@@ -277,10 +260,10 @@ ${docSources
         queryType: "specific",
         primarySource: detection.suggestedSources[0],
         additionalSources: detection.suggestedSources.slice(1),
-        confidence: 85, // Boost confidence for multi-source
+        confidence: 85,
         reasoning:
           detection.reasoning +
-          " (Automatically resolving ambiguity with multi-source answer)",
+          " (Auto-resolved ambiguity with multi-source)",
         needsClarification: false,
         suggestedSources: detection.suggestedSources,
       };
@@ -299,9 +282,6 @@ ${docSources
     };
   }
 
-  /**
-   * Generate clarification prompt for user
-   */
   generateClarificationPrompt(
     suggestedSources: string[],
     docSources?: DocSourceMetadata[]
@@ -325,206 +305,107 @@ ${docSources
 
     return {
       message:
-        "I detected multiple possible documentation sources for your question. Which one would you like to ask about?",
+        "I detected multiple possible documentation sources. Which one would you like to explore?",
       options,
     };
   }
 
   /**
-   * Handle meta queries about the platform
+   * Handle meta queries (Dynamic Language & Content)
+   * Answers "What is DocsTalk?" based on user language.
    */
   async handleMetaQuery(query: string): Promise<string> {
     const docSources = await this.getAvailableDocSources();
+    const versions = this.getTechStackVersions();
 
-    const lowerQuery = query.toLowerCase();
+    // Context for the AI to answer "Who are you?"
+    const techStackInfo = `
+    - Frontend: Next.js ${versions.next}, React ${versions.react}, Tailwind CSS ${versions.tailwind}
+    - Backend: Fastify, Supabase (Vector Store)
+    - AI: Google Gemini API ${versions.gemini} (RAG Architecture)
+    `;
 
-    // What is DocsTalk?
-    if (
-      lowerQuery.includes("what is docstalk") ||
-      lowerQuery.includes("what's docstalk") ||
-      lowerQuery.includes("tell me about docstalk") ||
-      lowerQuery.includes("ini aplikasi apa") ||
-      lowerQuery.includes("apa itu docstalk") ||
-      lowerQuery.includes("aplikasi ini")
-    ) {
-      if (
-        lowerQuery.includes("ini aplikasi apa") ||
-        lowerQuery.includes("apa itu docstalk") ||
-        lowerQuery.includes("aplikasi ini")
-      ) {
-        return `DocsTalk adalah asisten dokumentasi AI yang membantu developer menemukan jawaban dari dokumentasi resmi dengan cepat. Saat ini kami mendukung **${
-          docSources.length
-        } sumber dokumentasi**: ${docSources
-          .map((s) => s.name)
-          .join(
-            ", "
-          )}. Tanyakan saja pertanyaan Anda, dan saya akan mendeteksi dokumentasi mana yang Anda butuhkan secara otomatis!`;
-      }
-      return `DocsTalk is an AI-powered documentation Q&A platform that helps developers quickly find answers from official documentation. We currently support **${
-        docSources.length
-      } documentation sources**: ${docSources
-        .map((s) => s.name)
-        .join(
-          ", "
-        )}. Just ask your question, and I'll automatically detect which documentation you need and provide accurate answers!`;
-    }
+    const availableDocsInfo = docSources
+      .map((s) => `- ${s.name}: ${s.description}`)
+      .join("\n");
 
-    // How many docs / What docs available?
-    if (
-      lowerQuery.includes("how many") ||
-      lowerQuery.includes("what docs") ||
-      lowerQuery.includes("available") ||
-      lowerQuery.includes("support")
-    ) {
-      return `I currently support **${
-        docSources.length
-      } documentation sources**:\n\n${docSources
-        .map((s) => `• **${s.name}** - ${s.description}`)
-        .join(
-          "\n"
-        )}\n\nYou can ask questions about any of these, and I'll automatically detect which documentation you need!`;
-    }
+    const prompt = `
+    You are DocsTalk, an intelligent AI documentation assistant.
+    
+    **User Query:** "${query}"
+    
+    **Your Identity:**
+    - You are a RAG-based AI assistant designed to help developers find answers in official documentation.
+    - You are NOT just a generic LLM; you have access to specific indexed documentation.
+    - You currently support ${docSources.length} sources:
+    ${availableDocsInfo}
+    
+    **Your Tech Stack:**
+    ${techStackInfo}
+    
+    **Instructions:**
+    1. **Detect the language** of the User Query (Indonesian, English, etc.).
+    2. Answer the query naturally in that **SAME LANGUAGE**.
+    3. Be helpful, professional, and concise.
+    4. If asked about what you can do, mention that you can search specific documentation automatically.
+    
+    Answer now:
+    `;
 
-    // Tech Stack / Framework
-    if (
-      lowerQuery.includes("framework") ||
-      lowerQuery.includes("tech stack") ||
-      lowerQuery.includes("built with") ||
-      lowerQuery.includes("teknologi") ||
-      lowerQuery.includes("dibuat pakai") ||
-      lowerQuery.includes("menggunakan apa")
-    ) {
-      const versions = this.getTechStackVersions();
-      return `DocsTalk dibangun menggunakan teknologi modern berikut:\n\n**Frontend:**\n- **Next.js ${versions.next}** (App Router)\n- **React ${versions.react}**\n- **Tailwind CSS ${versions.tailwind}**\n- **Framer Motion** (untuk animasi)\n\n**Backend:**\n- **Fastify** (Node.js)\n- **Supabase** (PostgreSQL & Vector Store)\n- **Google Gemini API ${versions.gemini}** (AI Model)\n\n**Architecture:**\n- **Monorepo** (menggunakan Turborepo)\n- **RAG** (Retrieval-Augmented Generation) untuk akurasi jawaban.`;
-    }
-
-    // What can you do / help with?
-    if (
-      lowerQuery.includes("what can you") ||
-      lowerQuery.includes("how can you help") ||
-      lowerQuery.includes("capabilities")
-    ) {
-      return `I can help you with:\n\n✅ **Smart Documentation Search** - Ask questions in natural language\n✅ **Auto-Detection** - I automatically detect which documentation you're asking about\n✅ **Context-Aware Answers** - I remember your conversation context\n✅ **Multi-Framework Support** - Switch between ${docSources
-        .map((s) => s.name)
-        .join(
-          ", "
-        )} seamlessly\n\nJust ask your question, and I'll take care of the rest!`;
-    }
-
-    // Default meta response (Hybrid Approach: Fallback to LLM)
     try {
-      const versions = this.getTechStackVersions();
-      const techStack = `
-Frontend:
-- Next.js ${versions.next} (App Router)
-- React ${versions.react}
-- Tailwind CSS ${versions.tailwind}
-- Framer Motion (Animations)
-
-Backend:
-- Fastify (Node.js)
-- Supabase (PostgreSQL & Vector Store)
-- Google Gemini API ${versions.gemini} (AI Model)
-
-Architecture:
-- Monorepo (Turborepo)
-- RAG (Retrieval-Augmented Generation)
-`;
-
-      const docSourcesList = docSources
-        .map((s) => `- ${s.name}: ${s.description}`)
-        .join("\n");
-
-      const prompt = `You are DocsTalk, an AI assistant embedded inside a developer documentation system.
-
-You are NOT Gemini.
-You are NOT Google AI.
-You are DocsTalk.
-
-Here is your INTERNAL CONFIGURATION (read-only, truth source):
-
-TECH STACK:
-${techStack}
-
-DOCUMENTATION SOURCES:
-${docSourcesList}
-
-SYSTEM ROLE:
-You answer questions about:
-- Yourself
-- The platform DocsTalk
-- Your abilities
-- Your devices, sources, capability limits
-- Your configuration
-
-RULES:
-- Only answer from CONFIGURATION.
-- Do NOT hallucinate technologies.
-- If unknown, say "I don't have that info yet."
-- Speak as DocsTalk, not as an LLM brand.
-- Be friendly, helpful, and technical.
-
-USER QUESTION:
-"${query}"
-
-Answer clearly.`;
-
       const result = await this.client.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
-        config: {
-          temperature: 0.3,
-        },
+        config: { temperature: 0.3 },
       });
-
       return result.text || "I am DocsTalk, your documentation assistant.";
     } catch (error) {
-      console.error("Error in meta query fallback:", error);
-      return `DocsTalk is your Smart Documentation Assistant. I support ${
-        docSources.length
-      } documentation sources (${docSources
-        .map((s) => s.name)
-        .join(
-          ", "
-        )}) and can automatically detect which one you're asking about. How can I help you today?`;
+      // Fallback if AI fails
+      return `DocsTalk is your Smart Documentation Assistant. I support ${docSources.length} sources.`;
     }
   }
 
   /**
    * Get specialized instructions for a doc source
+   * NOW DYNAMIC: Generates prompt based on DB Keywords & Description!
    */
-  getDocSourceInstructions(docSource: string): string {
-    const instructions: Record<string, string> = {
-      nextjs: `You are an expert in Next.js framework. Focus on:
-- App Router and Pages Router patterns
-- Server Components vs Client Components
-- Data fetching (SSR, SSG, ISR)
-- API Routes and Server Actions
-- Routing and navigation
-- Image and Font optimization`,
+  async getDocSourceInstructions(docSourceId: string): Promise<string> {
+    // 1. Try to find source in cache/DB
+    const sources = await this.getAvailableDocSources();
+    const source = sources.find(
+      (s) => s.id.toLowerCase() === docSourceId.toLowerCase()
+    );
 
-      react: `You are an expert in React library. Focus on:
-- Hooks (useState, useEffect, useContext, etc)
-- Component composition and patterns
-- Props and state management
-- Lifecycle and effects
-- Performance optimization
-- React 18+ features (Suspense, Transitions, etc)`,
+    // 2. If source found in DB, build Dynamic Instruction
+    if (source) {
+      const keywordsList =
+        source.keywords.length > 0
+          ? source.keywords.join(", ")
+          : "standard patterns and best practices";
 
-      typescript: `You are an expert in TypeScript language. Focus on:
-- Type system and type inference
-- Interfaces and type aliases
-- Generics and utility types
-- tsconfig.json configuration
-- Advanced types (mapped, conditional, etc)
-- Best practices and patterns`,
-    };
+      return `You are an expert specialist in **${source.name}**.
+      
+**Context:**
+The user is asking questions specifically about ${source.name}.
+Description: ${source.description}
 
-    return instructions[docSource] || `You are an expert in ${docSource}.`;
+**Your Goal:**
+Provide accurate, idiomatic, and performance-oriented solutions using ${source.name}.
+
+**Key Focus Areas (based on database metadata):**
+- Focus heavily on these topics: ${keywordsList}.
+- Use official APIs and conventions.
+- Avoid deprecated features.
+- Provide code examples that are ready to copy-paste.`;
+    }
+
+    // 3. Fallback (If ID not found in DB for some reason)
+    return `You are an expert specialist in **${docSourceId}**.
+Focus on official documentation, best practices, and idiomatic code styles specific to the ${docSourceId} ecosystem.`;
   }
 
   /**
-   * Get tech stack versions from package.json
+   * Get tech stack versions
    */
   private getTechStackVersions(): {
     next: string;
@@ -533,13 +414,10 @@ Answer clearly.`;
     gemini: string;
   } {
     try {
-      // Try to find apps/web/package.json and apps/api/package.json
-      // Assuming we are running from apps/api or root
       const cwd = process.cwd();
       let webPkgPath = path.join(cwd, "apps/web/package.json");
       let apiPkgPath = path.join(cwd, "apps/api/package.json");
 
-      // If running from inside apps/api
       if (cwd.endsWith("apps/api")) {
         webPkgPath = path.join(cwd, "../web/package.json");
         apiPkgPath = path.join(cwd, "package.json");
@@ -552,7 +430,6 @@ Answer clearly.`;
         gemini: "Latest",
       };
 
-      // Read Web Package
       if (fs.existsSync(webPkgPath)) {
         const webPkg = JSON.parse(fs.readFileSync(webPkgPath, "utf-8"));
         const deps = { ...webPkg.dependencies, ...webPkg.devDependencies };
@@ -566,7 +443,6 @@ Answer clearly.`;
             .replace("~", "");
       }
 
-      // Read API Package
       if (fs.existsSync(apiPkgPath)) {
         const apiPkg = JSON.parse(fs.readFileSync(apiPkgPath, "utf-8"));
         const deps = { ...apiPkg.dependencies, ...apiPkg.devDependencies };
@@ -578,11 +454,10 @@ Answer clearly.`;
 
       return versions;
     } catch (error) {
-      console.error("Failed to read package versions:", error);
       return {
-        next: "16",
-        react: "19",
-        tailwind: "4",
+        next: "Latest",
+        react: "Latest",
+        tailwind: "Latest",
         gemini: "Latest",
       };
     }

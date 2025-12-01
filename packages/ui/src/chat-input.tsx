@@ -7,8 +7,6 @@ import { Send, Sparkles, ChevronDown, Globe, Bot } from "lucide-react";
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
-  selectedSource: string;
-  onSelectedSourceChange: (source: string) => void;
   responseMode: string;
   onResponseModeChange: (mode: string) => void;
 }
@@ -16,8 +14,6 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   disabled,
-  selectedSource,
-  onSelectedSourceChange,
   responseMode,
   onResponseModeChange,
 }: ChatInputProps) {
@@ -70,28 +66,6 @@ export function ChatInput({
 
           <div className="flex items-center justify-between px-3 pb-2 pt-1">
             <div className="flex items-center gap-2">
-              {/* Source Selector */}
-              <div className="relative group/source">
-                <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none">
-                  {selectedSource === "auto" ? (
-                    <Sparkles className="h-3.5 w-3.5 text-primary group-hover/source:text-primary transition-colors" />
-                  ) : (
-                    <Globe className="h-3.5 w-3.5 text-foreground group-hover/source:text-primary transition-colors" />
-                  )}
-                </div>
-                <select
-                  value={selectedSource}
-                  onChange={(e) => onSelectedSourceChange(e.target.value)}
-                  className="appearance-none pl-7 pr-6 py-1.5 rounded-lg bg-secondary/20 backdrop-blur-md border border-white/10 hover:bg-secondary/40 hover:border-white/20 text-xs font-medium text-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
-                >
-                  <option value="auto" className="bg-zinc-950 text-white">Auto</option>
-                  <option value="nextjs" className="bg-zinc-950 text-white">Next.js</option>
-                  <option value="react" className="bg-zinc-950 text-white">React</option>
-                  <option value="typescript" className="bg-zinc-950 text-white">TypeScript</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-foreground/50 pointer-events-none" />
-              </div>
-
               {/* Response Mode Selector */}
               <div className="relative group/mode">
                 <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none">
@@ -102,13 +76,12 @@ export function ChatInput({
                   onChange={(e) => onResponseModeChange(e.target.value)}
                   className="appearance-none pl-7 pr-6 py-1.5 rounded-lg bg-secondary/20 backdrop-blur-md border border-white/10 hover:bg-secondary/40 hover:border-white/20 text-xs font-medium text-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                 >
-                  <option value="friendly" className="bg-zinc-950 text-white">Friendly</option>
-                  <option value="formal" className="bg-zinc-950 text-white">Formal</option>
-                  <option value="tutor" className="bg-zinc-950 text-white">Tutor</option>
-                  <option value="simple" className="bg-zinc-950 text-white">Simple</option>
-                  <option value="technical_deep_dive" className="bg-zinc-950 text-white">Deep Dive</option>
-                  <option value="example_heavy" className="bg-zinc-950 text-white">Examples</option>
-                  <option value="summary_only" className="bg-zinc-950 text-white">Summary</option>
+                  <option value="auto" className="bg-zinc-950 text-white">Auto</option>
+                  <option value="frontend" className="bg-zinc-950 text-white">Frontend</option>
+                  <option value="backend" className="bg-zinc-950 text-white">Backend</option>
+                  <option value="fullstack" className="bg-zinc-950 text-white">Fullstack</option>
+                  <option value="debug" className="bg-zinc-950 text-white">Debug</option>
+                  <option value="architecture" className="bg-zinc-950 text-white">Architecture</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-foreground/50 pointer-events-none" />
               </div>
@@ -134,7 +107,8 @@ export function ChatInput({
         </div>
 
         <p className="text-[10px] text-muted-foreground text-center mt-3 opacity-60">
-          DocsTalk surfaces docs but might be out of date — check timestamp & source.
+          DocsTalk surfaces docs but might be out of date — check timestamp &
+          source.
         </p>
       </div>
     </div>

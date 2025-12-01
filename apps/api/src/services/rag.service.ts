@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { QdrantService } from "./qdrant.service";
+import { QdrantService } from "./qdrant.service.js";
 
 interface SearchResult {
   id: string;
@@ -30,6 +30,7 @@ interface RAGResponse {
 export class RAGService {
   private client: GoogleGenAI;
   public supabase: SupabaseClient;
+  private qdrant: QdrantService;
 
   constructor() {
     this.client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -37,6 +38,11 @@ export class RAGService {
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+    this.qdrant = new QdrantService();
+  }
+
+  async initialize() {
+    await this.qdrant.ensureCollection();
   }
 
   async checkUsageLimit(
@@ -359,79 +365,84 @@ Reformulated query:`;
     style: string;
   } {
     const modes: Record<string, { persona: string; style: string }> = {
-      formal: {
+      frontend: {
         persona:
-          "You are a technical documentation writer creating official reference material.",
+          "You are a frontend specialist focused on UI/UX and React patterns.",
         style: `**Response Format:**
-- Use Markdown headers (###) for sections
-- Professional, structured, and precise language
-- Complete sentences with formal tone
-- Structure: Introduction → Technical Details → Code Examples → References
-- Add blank lines between sections for readability`,
+- Use Markdown headers (###)
+- Focus on React best practices, hooks, and component patterns
+- Prioritize accessibility (a11y) and responsive design
+- Use modern CSS/Tailwind practices
+- Include visual examples or UI code snippets`,
+      },
+      backend: {
+        persona:
+          "You are a backend engineer focused on API design and database performance.",
+        style: `**Response Format:**
+- Use Markdown headers (###)
+- Focus on API design, database schemas, and query performance
+- Discuss security implications and error handling
+- Use TypeScript for type safety in backend code
+- Include SQL or ORM examples where relevant`,
+      },
+      fullstack: {
+        persona:
+          "You are a fullstack developer focused on end-to-end integration.",
+        style: `**Response Format:**
+- Use Markdown headers (###)
+- Connect frontend and backend concepts
+- Explain data flow from DB to UI
+- Discuss state management and API integration
+- Balance implementation details for both sides`,
+      },
+      debug: {
+        persona: "You are a debugging expert focused on root cause analysis.",
+        style: `**Response Format:**
+- Use Markdown headers (###)
+- Analyze potential causes step-by-step
+- Suggest logging and debugging techniques
+- Provide potential fixes with explanations
+- Focus on "why" it broke, not just "how" to fix it`,
+      },
+      architecture: {
+        persona:
+          "You are a software architect focused on high-level design and trade-offs.",
+        style: `**Response Format:**
+- Use Markdown headers (###)
+- Discuss system design patterns and scalability
+- Analyze trade-offs (pros/cons) of different approaches
+- Focus on maintainability and long-term impact
+- Reference industry standards and best practices`,
+      },
+      auto: {
+        persona:
+          "You are an expert AI developer with deep knowledge of the entire stack.",
+        style: `**Response Format:**
+- **IMPORTANT: Do NOT output your internal analysis or persona selection process.**
+- **Start your response directly with the answer to the user.**
+- **Dynamically adopt the most suitable persona internally:**
+  - If asking about UI/CSS/React -> Act as a **Frontend Specialist**.
+  - If asking about API/DB/Server -> Act as a **Backend Engineer**.
+  - If asking about errors/bugs -> Act as a **Debugging Expert**.
+  - If asking about high-level design -> Act as a **Software Architect**.
+  - If the question is general -> Act as a **Helpful Senior Developer**.
+- Use Markdown headers (###)
+- Keep the tone professional yet helpful.`,
       },
       friendly: {
         persona: "You are a helpful senior developer mentoring a teammate.",
         style: `**Response Format:**
-- Use Markdown headers (###) to organize the answer
+- Use Markdown headers (###)
 - Conversational and approachable tone
 - Lead with TL;DR or quick practical wins
 - Use simple analogies when helpful
 - Balance friendliness with technical accuracy
-- Add blank lines between paragraphs and code blocks`,
-      },
-      tutor: {
-        persona:
-          "You are a patient coding instructor teaching concepts step-by-step.",
-        style: `**Response Format:**
-- Use Markdown headers (###) for each step or concept
-- Break down concepts into clear, numbered steps
-- Use analogies and real-world examples
-- Explain "why" behind each concept, not just "how"
-- Include learning tips and common pitfalls
-- Encourage understanding over memorization`,
-      },
-      simple: {
-        persona: "You are a pragmatic developer who values efficiency.",
-        style: `**Response Format:**
-- Use Markdown headers (###) for key points
-- Ultra-concise, no fluff or filler words
-- Use bullet points for lists
-- Code first, minimal explanation
-- Action-oriented language (Do X, Use Y, Avoid Z)
-- Add blank lines between sections
-- Maximum 5-6 sentences total explanation`,
-      },
-      technical_deep_dive: {
-        persona:
-          "You are a senior architect explaining implementation details.",
-        style: `**Response Format:**
-- Use Markdown headers (###) for architecture components
-- Deep technical analysis with implementation specifics
-- Discuss architecture, design patterns, and tradeoffs
-- Reference internals, edge cases, and performance implications
-- Include best practices and anti-patterns`,
-      },
-      example_heavy: {
-        persona: "You are a code-focused developer who learns by doing.",
-        style: `**Response Format:**
-- Use Markdown headers (###) for each example
-- Prioritize working code examples above all
-- Minimal theory - show, don't tell
-- Multiple examples for different use cases
-- Include expected output/behavior in comments`,
-      },
-      summary_only: {
-        persona: "You are creating a quick reference or cheat sheet.",
-        style: `**Response Format:**
-- Use Markdown headers (###) for topics
-- Extremely brief - 3-4 sentences maximum
-- Key takeaways only, no elaboration
-- Bullet list format preferred
-- No code unless absolutely critical`,
+Language is NOT a restricted capability.
+Always reply in user language even if not configured.`,
       },
     };
 
-    return modes[mode] || modes["friendly"]; // Default to friendly
+    return modes[mode] || modes["auto"]; // Default to auto
   }
 
   /**
@@ -446,8 +457,7 @@ Reformulated query:`;
     const queryEmbedding = await this.generateEmbedding(query);
 
     // Search Qdrant
-    const qdrant = new QdrantService();
-    const results = await qdrant.search(queryEmbedding, limit * 2, source);
+    const results = await this.qdrant.search(queryEmbedding, limit * 2, source);
 
     // Map Qdrant results to SearchResult
     const searchResults: SearchResult[] = results.map((res) => ({
@@ -522,36 +532,30 @@ Reformulated query:`;
   /**
    * Generate answer using RAG
    */
+  /**
+   * Generate answer using RAG with Dynamic Language & Smart Fallback
+   */
   async generateAnswer(
     query: string,
     source?: string,
     conversationHistory?: Array<{ role: string; content: string }>,
     responseMode: string = "friendly"
   ): Promise<RAGResponse> {
-    // 1. Reformulate query if needed (context-aware retrieval)
+    // 1. Reformulate query (Keep this for better search matches)
     const searchQuery = await this.reformulateQuery(query, conversationHistory);
 
-    // 2. Search for relevant context using reformulated query
+    // 2. Search for relevant context
     const searchResults = await this.searchDocumentation(
       searchQuery,
       source,
       5
     );
 
-    if (searchResults.length === 0) {
-      return {
-        answer:
-          "I couldn't find relevant information in the documentation. Please try rephrasing your question.",
-        references: [],
-        tokensUsed: 0,
-      };
-    }
+    // Note: We don't return early if results are empty anymore.
+    // We let the LLM handle "0 results" using general knowledge.
 
-    // 2. Get expanded context with surrounding chunks
-    const expandedResults = await this.getExpandedContext(searchResults);
-
-    // 3. Build context from expanded results
-    const context = expandedResults
+    // 3. Build context
+    const context = searchResults
       .map(
         (result) => `[${result.title}]
 URL: ${result.url}
@@ -560,7 +564,7 @@ Content: ${result.content}
       )
       .join("\n---\n");
 
-    // 4. Build conversation history context if available
+    // 4. Build conversation history
     const historyContext =
       conversationHistory && conversationHistory.length > 0
         ? `\n**Previous conversation:**\n${conversationHistory
@@ -569,57 +573,52 @@ Content: ${result.content}
             .join("\n")}\n\n`
         : "";
 
-    // 5. Generate answer with Gemini (with conversation context + v16 priority + response mode)
-    // Get persona and style for selected mode
+    // 5. Get Persona
     const { persona, style } = this.getResponseModePersona(responseMode);
 
-    const prompt = `${persona} ${historyContext}Your teammate asked:
+    // 6. BUILD THE GLOBAL-READY PROMPT
+    const prompt = `
+${persona}
 
-**Question:** "${query}"
+${historyContext}
 
-**Context:**
+**User Question:** "${query}"
 
-- Be accurate - only use info from docs below${
-      conversationHistory && conversationHistory.length > 0
-        ? " and conversation history"
-        : ""
-    }
-${
-  conversationHistory && conversationHistory.length > 0
-    ? "- Remember our conversation - reference it if relevant\n"
-    : ""
-}
+**Available Documentation Context:**
+${context || "No specific documentation found for this query."}
+
+---
+
+**### CRITICAL INSTRUCTIONS (MUST FOLLOW):**
+
+**1. DYNAMIC LANGUAGE DETECTION (HIGHEST PRIORITY):**
+   - **Detect the language** used in the "User Question" above (e.g., Indonesian, Arabic, French, English, etc.).
+   - **YOU MUST RESPOND IN THAT EXACT SAME LANGUAGE.**
+   - Even if the "Documentation Context" is in English, you **MUST TRANSLATE** the answer into the User's language.
+   - Do NOT mix languages unless it's for standard code terms (like 'middleware', 'function').
+
+**2. INTELLIGENT RETRIEVAL:**
+   - **Step A:** Check if the "Available Documentation Context" contains the answer to the User Question.
+   - **Step B (Strict RAG):** IF the context is relevant, use it to answer and cite the [URL] at the end.
+   - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** (e.g., user asks about "VPS Deployment" but context is just "syntax definitions") OR **empty**, explicitly IGNORE the context constraints.
+     - Instead, answer the question using your **General Expert Knowledge** to be helpful.
+     - If answering from general knowledge, do NOT invent fake source URLs.
+
+**3. FORMATTING:**
 ${style}
 
-IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
-
-**Official Documentation:**
-
-${context}
-
-Give your answer now. Cite source URLs at the end.
-
-IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
-Output your thought process inside <thinking> tags.
-For example:
-<thinking>
-1. Assessing the user's question...
-2. Checking the provided context...
-3. Formulating the explanation...
-</thinking>
-[Your actual answer here]
-
-Response:
+Give your answer now based on the instructions above.
 `;
 
     const result = await this.client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        temperature: 0.2, // Low temperature for accuracy
-        maxOutputTokens: 4096, // Increased from 2048 (2x for complex queries)
+        temperature: 0.3, // Sedikit dinaikkan agar translasinya lebih luwes
+        maxOutputTokens: 4096,
       },
     });
+    
     const responseText = result.text;
 
     if (!responseText) {
@@ -630,34 +629,22 @@ Response:
     const codeMatch = responseText.match(/```[\w]*\n([\s\S]*?)```/);
     const code = codeMatch ? codeMatch[1].trim() : undefined;
 
-    // Build references
+    // Build references (Only if we actually used RAG)
+    // We filter references to ensure we don't return irrelevant ones if AI switched to General Knowledge
+    // But for simplicity in UI, we can just return the top matches found, 
+    // or you can ask the AI to output a specific flag if it used docs. 
+    // For now, returning the search hits is standard practice.
     const references = searchResults.slice(0, 3).map((result) => ({
       title: result.title,
       url: result.url,
       snippet: result.content.substring(0, 150) + "...",
     }));
 
-    // Estimate tokens (rough approximation)
     const tokensUsed = Math.ceil((prompt.length + responseText.length) / 4);
 
-    // Extract reasoning if present
-    let reasoning: string | undefined;
-    let finalAnswer = responseText;
-
-    const thinkingMatch = responseText.match(
-      /<thinking>([\s\S]*?)<\/thinking>/
-    );
-    if (thinkingMatch) {
-      reasoning = thinkingMatch[1].trim();
-      finalAnswer = responseText
-        .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
-        .trim();
-    }
-
     return {
-      answer: finalAnswer,
+      answer: responseText,
       code,
-      reasoning,
       references,
       tokensUsed,
     };
@@ -666,28 +653,26 @@ Response:
   /**
    * Generate streaming answer
    */
+/**
+   * Generate streaming answer using RAG with Dynamic Language & Smart Fallback
+   */
   async *generateAnswerStream(
     query: string,
     source?: string,
     conversationHistory?: Array<{ role: string; content: string }>,
     responseMode: string = "friendly"
   ): AsyncGenerator<string, void, unknown> {
-    // 1. Reformulate query if needed (context-aware retrieval)
+    // 1. Reformulate query
     const searchQuery = await this.reformulateQuery(query, conversationHistory);
 
-    // 2. Search for relevant context using reformulated query
+    // 2. Search for relevant context
     const searchResults = await this.searchDocumentation(
       searchQuery,
       source,
       5
     );
 
-    if (searchResults.length === 0) {
-      yield "I couldn't find relevant information in the documentation.";
-      return;
-    }
-
-    // 2. Build context
+    // 3. Build context
     const context = searchResults
       .map(
         (result) => `[${result.title}]
@@ -697,7 +682,7 @@ Content: ${result.content}
       )
       .join("\n---\n");
 
-    // 3. Build conversation history context
+    // 4. Build conversation history
     const historyContext =
       conversationHistory && conversationHistory.length > 0
         ? `\n**Previous conversation:**\n${conversationHistory
@@ -706,59 +691,134 @@ Content: ${result.content}
             .join("\n")}\n\n`
         : "";
 
-    // 4. Generate streaming answer (with conversation context + v16 priority + response mode)
+    // 5. Get Persona
     const { persona, style } = this.getResponseModePersona(responseMode);
 
-    const prompt = `${persona} ${historyContext}
-    
-**Context:**
+    // 6. BUILD THE GLOBAL-READY PROMPT (SAMA PERSIS DENGAN NON-STREAM AGAR KONSISTEN)
+    const prompt = `
+${persona}
 
-${
-  conversationHistory && conversationHistory.length > 0
-    ? "- Remember our conversation - reference it if relevant\n"
-    : ""
-}
+${historyContext}
+
+**User Question:** "${query}"  <-- PENTING: JANGAN LUPA INI
+
+**Available Documentation Context:**
+${context || "No specific documentation found for this query."}
+
+---
+
+**### CRITICAL INSTRUCTIONS (MUST FOLLOW):**
+
+**1. DYNAMIC LANGUAGE DETECTION (HIGHEST PRIORITY):**
+   - **Detect the language** used in the "User Question" above (e.g., Indonesian, Arabic, French, English, etc.).
+   - **YOU MUST RESPOND IN THAT EXACT SAME LANGUAGE.**
+   - Even if the "Documentation Context" is in English, you **MUST TRANSLATE** the answer into the User's language.
+
+**2. INTELLIGENT RETRIEVAL:**
+   - **Step A:** Check if the "Available Documentation Context" contains the answer to the User Question.
+   - **Step B (Strict RAG):** IF the context is relevant, use it to answer and cite the [URL] at the end.
+   - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** (e.g., user asks about 'VPS' but context is 'venv') OR **empty**, explicitly IGNORE the context constraints.
+     - Instead, answer the question using your **General Expert Knowledge** to be helpful.
+     - If answering from General Knowledge, explicitly state at the end: "*(Answered using general knowledge)*".
+
+**3. FORMATTING:**
 ${style}
 
-IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
+Give your answer now.
+`;
 
-IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
-Output your thought process inside <thinking> tags.
-For example:
-<thinking>
-1. Assessing the user's question...
-2. Checking the provided context...
-3. Formulating the explanation...
-</thinking>
-[Your actual answer here]
+    // 7. Generate Stream
+    const result = await this.client.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.3, // Samakan dengan non-stream
+        maxOutputTokens: 4096,
+      },
+    });
 
-**Official Documentation:**
+    for await (const chunk of result) {
+      let text = chunk.text;
+      if (!text) continue;
 
-${context}
+      yield text;
+    }
+  }
 
-Response:
+/**
+   * Generate general answer stream (AI Manager Layer)
+   * Answers questions not in the docs using general knowledge
+   */
+  async *generateGeneralAnswerStream(
+    query: string,
+    conversationHistory?: Array<{ role: string; content: string }>,
+    responseMode: string = "auto"
+  ): AsyncGenerator<string, void, unknown> {
+    // 1. Build conversation history context
+    const historyContext =
+      conversationHistory && conversationHistory.length > 0
+        ? `\n**Previous conversation:**\n${conversationHistory
+            .slice(-4)
+            .map((msg) => `${msg.role}: ${msg.content}`)
+            .join("\n")}\n\n`
+        : "";
+
+    // 2. Get persona (same logic as RAG)
+    const { persona, style } = this.getResponseModePersona(responseMode);
+
+    // 3. BUILD PROMPT (Aligned with Hybrid RAG Logic)
+    const prompt = `
+${persona}
+
+${historyContext}
+
+**User Question:** "${query}"
+
+**Mode:** GENERAL KNOWLEDGE (No specific documentation context provided).
+
+---
+
+**### CRITICAL INSTRUCTIONS (MUST FOLLOW):**
+
+**1. DYNAMIC LANGUAGE DETECTION (HIGHEST PRIORITY):**
+   - **Detect the language** used in the "User Question" above (e.g., Indonesian, Arabic, French, English, etc.).
+   - **YOU MUST RESPOND IN THAT EXACT SAME LANGUAGE.**
+   - Do NOT answer in English unless the user asked in English.
+
+**2. RESPONSE STRATEGY:**
+   - You are acting as the **AI Manager** answering from your general knowledge.
+   - Answer naturally and helpfully.
+   - **Mandatory:** Since this is general knowledge, include a section at the very end called "### Official References" (or the equivalent in the target language).
+     - Provide the official homepage or documentation URL for the technology being discussed.
+     - Format: "- [Title](URL)"
+   - **Disclaimer:** End your response with a subtle note: "*(Answered using general knowledge)*" to maintain transparency.
+
+**3. FORMATTING:**
+${style}
+
+Give your answer now.
 `;
 
     const result = await this.client.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        temperature: 0.2,
-        maxOutputTokens: 4096,
+        temperature: 0.3, // Slightly higher for general creativity
+        maxOutputTokens: 2048,
       },
     });
 
     for await (const chunk of result) {
-      const text = chunk.text;
-      if (text) {
-        yield text;
-      }
+      let text = chunk.text;
+      if (!text) continue;
+
+      yield text;
     }
   }
 
-  /**
+ /**
    * Generate answer with router integration
-   * Used by auto-detect endpoints
+   * Used by auto-detect endpoints (Hybrid RAG & Language Aware)
    */
   async generateAnswerWithRouter(
     query: string,
@@ -769,6 +829,7 @@ Response:
     docSourceInstructions?: string
   ): Promise<RAGResponse> {
     // If multi-source, merge results
+    // NOTE: Pastikan generateMultiSourceAnswer nanti juga diupdate dengan logic Hybrid!
     if (additionalSources && additionalSources.length > 0) {
       return this.generateMultiSourceAnswer(
         query,
@@ -780,20 +841,16 @@ Response:
 
     // Single source with optional specialized instructions
     const searchQuery = await this.reformulateQuery(query, conversationHistory);
+    
+    // 1. Search (Tetap lakukan pencarian)
     const searchResults = await this.searchDocumentation(
       searchQuery,
       primarySource,
       5
     );
 
-    if (searchResults.length === 0) {
-      return {
-        answer:
-          "I couldn't find relevant information in the documentation. Please try rephrasing your question.",
-        references: [],
-        tokensUsed: 0,
-      };
-    }
+    // DELETE: if (searchResults.length === 0) { ... }
+    // Kita hapus blok ini agar AI bisa fallback ke General Knowledge
 
     const expandedResults = await this.getExpandedContext(searchResults);
     const context = expandedResults
@@ -815,50 +872,54 @@ Content: ${result.content}
 
     const { persona, style } = this.getResponseModePersona(responseMode);
 
-    // Add doc source instructions if provided
+    // Add doc source instructions if provided (Integration point)
     const specializedInstructions = docSourceInstructions
-      ? `\n\n**Your Expertise:**\n${docSourceInstructions}\n`
+      ? `\n**Specialized Expertise for this Router:**\n${docSourceInstructions}\n`
       : "";
 
-    const prompt = `${persona} ${historyContext}Your teammate asked:
-
-**Question:** "${query}"
-
-**Context:**
-
-- Be accurate - only use info from docs below${
-      conversationHistory && conversationHistory.length > 0
-        ? " and conversation history"
-        : ""
-    }
-${
-  conversationHistory && conversationHistory.length > 0
-    ? "- Remember our conversation - reference it if relevant\n"
-    : ""
-}
-${style}
+    // BUILD HYBRID PROMPT
+    const prompt = `
+${persona}
 ${specializedInstructions}
 
-**Official Documentation:**
+${historyContext}
 
-${context}
+**User Question:** "${query}"
 
-Give your answer now. Cite source URLs at the end.
+**Available Documentation Context:**
+${context || "No specific documentation found for this query."}
 
-IMPORTANT: Before answering, you MUST explicitly think through the problem step-by-step.
-Output your thought process inside <thinking> tags.
+---
 
-Response:
+**### CRITICAL INSTRUCTIONS (MUST FOLLOW):**
+
+**1. DYNAMIC LANGUAGE DETECTION (HIGHEST PRIORITY):**
+   - **Detect the language** used in the "User Question" above.
+   - **YOU MUST RESPOND IN THAT EXACT SAME LANGUAGE.**
+   - Even if the context is in English, you **MUST TRANSLATE** the answer to the User's language.
+
+**2. INTELLIGENT RETRIEVAL:**
+   - **Step A:** Check if the "Available Documentation Context" contains the answer.
+   - **Step B (Strict RAG):** IF relevant, use the docs and cite URLs.
+   - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** or **empty**, IGNORE the context constraints.
+     - Answer using your **General Expert Knowledge**.
+     - Explicitly state at the end: "*(Answered using general knowledge)*".
+
+**3. FORMATTING:**
+${style}
+
+Give your answer now.
 `;
 
     const result = await this.client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        temperature: 0.2,
+        temperature: 0.3, // Konsisten dengan settingan Hybrid lainnya
         maxOutputTokens: 4096,
       },
     });
+    
     const responseText = result.text;
 
     if (!responseText) {
@@ -876,30 +937,16 @@ Response:
 
     const tokensUsed = Math.ceil((prompt.length + responseText.length) / 4);
 
-    let reasoning: string | undefined;
-    let finalAnswer = responseText;
-
-    const thinkingMatch = responseText.match(
-      /<thinking>([\s\S]*?)<\/thinking>/
-    );
-    if (thinkingMatch) {
-      reasoning = thinkingMatch[1].trim();
-      finalAnswer = responseText
-        .replace(/<thinking>[\s\S]*?<\/thinking>/, "")
-        .trim();
-    }
-
     return {
-      answer: finalAnswer,
+      answer: responseText,
       code,
-      reasoning,
       references,
       tokensUsed,
     };
   }
 
-  /**
-   * Generate answer from multiple doc sources
+/**
+   * Generate answer from multiple doc sources (Hybrid RAG & Language Aware)
    */
   private async generateMultiSourceAnswer(
     query: string,
@@ -916,14 +963,8 @@ Response:
       allResults.push(...results);
     }
 
-    if (allResults.length === 0) {
-      return {
-        answer:
-          "I couldn't find relevant information across the requested documentation sources.",
-        references: [],
-        tokensUsed: 0,
-      };
-    }
+    // DELETE: if (allResults.length === 0) { ... }
+    // Hapus blok "Early Exit" di atas. Biarkan dia lanjut ke bawah meskipun kosong.
 
     // Sort by similarity and take top results
     const topResults = allResults
@@ -931,6 +972,8 @@ Response:
       .slice(0, 6);
 
     const expandedResults = await this.getExpandedContext(topResults);
+    
+    // Build Context String
     const context = expandedResults
       .map(
         (result) => `[${result.title}] (Source: ${result.source})
@@ -950,42 +993,62 @@ Content: ${result.content}
 
     const { persona, style } = this.getResponseModePersona(responseMode);
 
-    const prompt = `${persona} ${historyContext}Your teammate asked a question that spans multiple documentation sources:
+    // BUILD HYBRID PROMPT FOR MULTI-SOURCE
+    const prompt = `
+${persona}
 
-**Question:** "${query}"
+${historyContext}
 
-**Context:**
+**User Question:** "${query}"
 
-- You have access to information from: ${sources.join(", ")}
-- Synthesize information across sources when relevant
-- Clearly indicate which source each piece of information comes from
+**Target Documentation Sources:** ${sources.join(", ")}
+
+**Available Documentation Context:**
+${context || "No specific documentation found across the requested sources."}
+
+---
+
+**### CRITICAL INSTRUCTIONS (MUST FOLLOW):**
+
+**1. DYNAMIC LANGUAGE DETECTION (HIGHEST PRIORITY):**
+   - **Detect the language** used in the "User Question".
+   - **YOU MUST RESPOND IN THAT EXACT SAME LANGUAGE.**
+   - Even if the context is in English, translate the answer to the User's language.
+
+**2. INTELLIGENT SYNTHESIS & RETRIEVAL:**
+   - **Step A:** Check if the "Available Documentation Context" contains the answer.
+   - **Step B (Strict RAG):** IF relevant, synthesize information from the different sources.
+     - Clearly indicate which source a piece of info comes from (e.g., "According to React docs...", "In Tailwind...").
+     - Cite URLs at the end.
+   - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** or **empty**, IGNORE the context constraints.
+     - Answer using your **General Expert Knowledge**.
+     - Explicitly state at the end: "*(Answered using general knowledge)*".
+
+**3. FORMATTING:**
 ${style}
 
-IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
-
-**Official Documentation (Multiple Sources):**
-
-${context}
-
-Give your answer now. Cite source URLs and indicate which framework/library each part refers to.
-
-Response:
+Give your answer now.
 `;
 
     const result = await this.client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        temperature: 0.2,
+        temperature: 0.3, // Konsisten
         maxOutputTokens: 4096,
       },
     });
+    
     const responseText = result.text;
 
     if (!responseText) {
       throw new Error("No response text generated");
     }
 
+    const codeMatch = responseText.match(/```[\w]*\n([\s\S]*?)```/);
+    const code = codeMatch ? codeMatch[1].trim() : undefined;
+
+    // References logic: Return them if we found them, even if AI used General Knowledge (optional but good for UX)
     const references = topResults.slice(0, 5).map((result) => ({
       title: `${result.title} (${result.source})`,
       url: result.url,
@@ -996,13 +1059,13 @@ Response:
 
     return {
       answer: responseText,
-      references,
+      references, // Frontend bisa memutuskan mau menampilkan ini atau tidak
       tokensUsed,
     };
   }
 
   /**
-   * Generate streaming answer from multiple doc sources
+   * Generate streaming answer from multiple doc sources (Hybrid RAG & Language Aware)
    */
   async *generateMultiSourceAnswerStream(
     query: string,
@@ -1019,10 +1082,8 @@ Response:
       allResults.push(...results);
     }
 
-    if (allResults.length === 0) {
-      yield "I couldn't find relevant information across the requested documentation sources.";
-      return;
-    }
+    // DELETE: if (allResults.length === 0) { ... }
+    // Kita hapus blok "Early Exit" ini agar Stream tetap jalan ke logika Fallback
 
     // Sort by similarity and take top results
     const topResults = allResults
@@ -1049,93 +1110,57 @@ Content: ${result.content}
 
     const { persona, style } = this.getResponseModePersona(responseMode);
 
-    const prompt = `${persona} ${historyContext}Your teammate asked a question that spans multiple documentation sources:
+    // BUILD HYBRID PROMPT FOR MULTI-SOURCE STREAM
+    const prompt = `
+${persona}
 
-**Question:** "${query}"
+${historyContext}
 
-**Context:**
+**User Question:** "${query}"
 
-- You have access to information from: ${sources.join(", ")}
-- Synthesize information across sources when relevant
-- Clearly indicate which source each piece of information comes from
+**Target Documentation Sources:** ${sources.join(", ")}
+
+**Available Documentation Context:**
+${context || "No specific documentation found across the requested sources."}
+
+---
+
+**### CRITICAL INSTRUCTIONS (MUST FOLLOW):**
+
+**1. DYNAMIC LANGUAGE DETECTION (HIGHEST PRIORITY):**
+   - **Detect the language** used in the "User Question".
+   - **YOU MUST RESPOND IN THAT EXACT SAME LANGUAGE.**
+   - Even if the context is in English, translate the answer to the User's language.
+
+**2. INTELLIGENT SYNTHESIS & RETRIEVAL:**
+   - **Step A:** Check if the "Available Documentation Context" contains the answer.
+   - **Step B (Strict RAG):** IF relevant, synthesize information from the different sources.
+     - Clearly indicate which source a piece of info comes from (e.g., "According to React docs...", "In Tailwind...").
+     - Cite URLs at the end.
+   - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** or **empty**, IGNORE the context constraints.
+     - Answer using your **General Expert Knowledge**.
+     - Explicitly state at the end: "*(Answered using general knowledge)*".
+
+**3. FORMATTING:**
 ${style}
 
-IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
-
-**Official Documentation (Multiple Sources):**
-
-${context}
-
-Give your answer now. Cite source URLs and indicate which framework/library each part refers to.
-
-Response:
+Give your answer now.
 `;
 
     const result = await this.client.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        temperature: 0.2,
+        temperature: 0.3, // Konsisten dengan method lain
         maxOutputTokens: 4096,
       },
     });
 
     for await (const chunk of result) {
-      const text = chunk.text;
-      if (text) {
-        yield text;
-      }
-    }
-  }
+      let text = chunk.text;
+      if (!text) continue;
 
-  /**
-   * Generate streaming answer for general queries (fallback agent)
-   */
-  async *generateGeneralAnswerStream(
-    query: string,
-    conversationHistory?: Array<{ role: string; content: string }>,
-    responseMode: string = "friendly"
-  ): AsyncGenerator<string, void, unknown> {
-    const historyContext =
-      conversationHistory && conversationHistory.length > 0
-        ? `\n**Previous conversation:**\n${conversationHistory
-            .slice(-4)
-            .map((msg) => `${msg.role}: ${msg.content}`)
-            .join("\n")}\n\n`
-        : "";
-
-    const { persona, style } = this.getResponseModePersona(responseMode);
-
-    const prompt = `${persona} ${historyContext}The user asked a question that is NOT in the documentation.
-
-**Question:** "${query}"
-
-**Instructions:**
-1. Answer the question using your general knowledge.
-2. Be helpful and accurate.
-3. IMPORTANT: Do NOT include any disclaimer about the topic not being in the documentation. The frontend will handle the warning.
-4. Respect the user's language (Indonesian/English).
-${style}
-
-IMPORTANT: ALWAYS respond in the same language as the user's question. If the user asks in Indonesian, respond in Indonesian. If in English, respond in English.
-
-Response:
-`;
-
-    const result = await this.client.models.generateContentStream({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        temperature: 0.3, // Slightly higher for general creativity
-        maxOutputTokens: 2048,
-      },
-    });
-
-    for await (const chunk of result) {
-      const text = chunk.text;
-      if (text) {
-        yield text;
-      }
+      yield text;
     }
   }
 }

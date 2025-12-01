@@ -8,6 +8,20 @@ import { Calendar, Tag, GitCommit } from "lucide-react";
 export default function ChangelogPage() {
   const changes = [
     {
+      version: "v0.2.1-beta",
+      date: "December 1, 2025",
+      title: "Critical RAG Fixes & SSE Streaming",
+      type: "major",
+      items: [
+        "Fixed SSE streaming format for auto-detect endpoint (event: field missing)",
+        "Implemented forceDocSource bypass to prevent clarification loops",
+        "Resolved frontend empty response issue (stream=false default bug)",
+        "Added proper routing metadata in SSE responses",
+        "Unified all response types (meta/clarification/normal) to use SSE format",
+        "Fixed TypeScript import/export naming conflicts",
+      ],
+    },
+    {
       version: "v0.2.0-beta.3",
       date: "November 30, 2025",
       title: "Hybrid Architecture & Scalability",

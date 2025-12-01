@@ -12,6 +12,7 @@ const fastify = Fastify({
 
 // Initialize RAG service
 const ragService = new RAGService();
+await ragService.initialize();
 
 // Initialize Router service
 const routerService = new RouterService(ragService.supabase);
