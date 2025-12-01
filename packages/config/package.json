@@ -1,6 +1,6 @@
 {
   "name": "@docstalk/config",
-  "version": "0.2.0-beta.3",
+  "version": "0.2.1-beta",
   "private": true,
   "main": "./index.js",
   "files": [

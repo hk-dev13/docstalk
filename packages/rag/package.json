@@ -1,6 +1,6 @@
 {
   "name": "@docstalk/rag",
-  "version": "0.2.0-beta.3",
+  "version": "0.2.1-beta",
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
