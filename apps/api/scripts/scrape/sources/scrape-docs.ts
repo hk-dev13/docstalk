@@ -90,6 +90,47 @@ const DOC_CONFIGS = {
     urlPattern: /^https:\/\/go\.dev\/doc/,
     maxPages: 200,
   },
+  docker: {
+    name: "Docker",
+    baseUrl: "https://docs.docker.com",
+    startUrls: [
+      "https://docs.docker.com/get-started/",
+      "https://docs.docker.com/guides/",
+      "https://docs.docker.com/reference/",
+    ],
+    urlPattern: /^https:\/\/docs\.docker\.com\/(get-started|guides|reference|engine|compose|build|desktop)/,
+    maxPages: 150,
+  },
+  fastapi: {
+    name: "FastAPI",
+    baseUrl: "https://fastapi.tiangolo.com",
+    startUrls: [
+      "https://fastapi.tiangolo.com/tutorial/",
+      "https://fastapi.tiangolo.com/advanced/",
+    ],
+    urlPattern: /^https:\/\/fastapi\.tiangolo\.com\/(tutorial|advanced|deployment|reference)/,
+    maxPages: 150,
+  },
+  vue: {
+    name: "Vue.js",
+    baseUrl: "https://vuejs.org",
+    startUrls: [
+      "https://vuejs.org/guide/introduction.html",
+      "https://vuejs.org/api/",
+    ],
+    urlPattern: /^https:\/\/vuejs\.org\/(guide|api)/,
+    maxPages: 150,
+  },
+  postgresql: {
+    name: "PostgreSQL",
+    baseUrl: "https://www.postgresql.org/docs/current/",
+    startUrls: [
+      "https://www.postgresql.org/docs/current/tutorial.html",
+      "https://www.postgresql.org/docs/current/sql.html",
+    ],
+    urlPattern: /^https:\/\/www\.postgresql\.org\/docs\/current/,
+    maxPages: 150,
+  },
 };
 
 /**
