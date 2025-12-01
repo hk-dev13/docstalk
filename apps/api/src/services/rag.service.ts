@@ -618,7 +618,7 @@ Give your answer now based on the instructions above.
         maxOutputTokens: 4096,
       },
     });
-    
+
     const responseText = result.text;
 
     if (!responseText) {
@@ -631,8 +631,8 @@ Give your answer now based on the instructions above.
 
     // Build references (Only if we actually used RAG)
     // We filter references to ensure we don't return irrelevant ones if AI switched to General Knowledge
-    // But for simplicity in UI, we can just return the top matches found, 
-    // or you can ask the AI to output a specific flag if it used docs. 
+    // But for simplicity in UI, we can just return the top matches found,
+    // or you can ask the AI to output a specific flag if it used docs.
     // For now, returning the search hits is standard practice.
     const references = searchResults.slice(0, 3).map((result) => ({
       title: result.title,
@@ -653,7 +653,7 @@ Give your answer now based on the instructions above.
   /**
    * Generate streaming answer
    */
-/**
+  /**
    * Generate streaming answer using RAG with Dynamic Language & Smart Fallback
    */
   async *generateAnswerStream(
@@ -700,7 +700,7 @@ ${persona}
 
 ${historyContext}
 
-**User Question:** "${query}"  <-- PENTING: JANGAN LUPA INI
+**User Question:** "${query}"
 
 **Available Documentation Context:**
 ${context || "No specific documentation found for this query."}
@@ -745,7 +745,7 @@ Give your answer now.
     }
   }
 
-/**
+  /**
    * Generate general answer stream (AI Manager Layer)
    * Answers questions not in the docs using general knowledge
    */
@@ -816,7 +816,7 @@ Give your answer now.
     }
   }
 
- /**
+  /**
    * Generate answer with router integration
    * Used by auto-detect endpoints (Hybrid RAG & Language Aware)
    */
@@ -841,7 +841,7 @@ Give your answer now.
 
     // Single source with optional specialized instructions
     const searchQuery = await this.reformulateQuery(query, conversationHistory);
-    
+
     // 1. Search (Tetap lakukan pencarian)
     const searchResults = await this.searchDocumentation(
       searchQuery,
@@ -919,7 +919,7 @@ Give your answer now.
         maxOutputTokens: 4096,
       },
     });
-    
+
     const responseText = result.text;
 
     if (!responseText) {
@@ -945,7 +945,7 @@ Give your answer now.
     };
   }
 
-/**
+  /**
    * Generate answer from multiple doc sources (Hybrid RAG & Language Aware)
    */
   private async generateMultiSourceAnswer(
@@ -972,7 +972,7 @@ Give your answer now.
       .slice(0, 6);
 
     const expandedResults = await this.getExpandedContext(topResults);
-    
+
     // Build Context String
     const context = expandedResults
       .map(
@@ -1038,7 +1038,7 @@ Give your answer now.
         maxOutputTokens: 4096,
       },
     });
-    
+
     const responseText = result.text;
 
     if (!responseText) {

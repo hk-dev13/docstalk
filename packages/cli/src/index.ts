@@ -105,17 +105,21 @@ program
     );
 
     try {
-      const response = await fetch("http://127.0.0.1:3001/api/v1/chat/auto", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query,
-          forceDocSource: options.source || undefined,
-          userId: "cli_user",
-        }),
-      });
+      const response = await fetch(
+        "http://127.0.0.1:3001/api/v1/chat/auto/stream",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query,
+            forceDocSource: options.source || undefined,
+            userId: "cli_user",
+            stream: true, // Enable streaming
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(
@@ -123,14 +127,62 @@ program
         );
       }
 
-      const data = (await response.json()) as any;
+      // Parse SSE stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      let routingInfo: any = null;
+      let clarificationData: any = null;
+      let answer = "";
+      let references: any[] = [];
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              const eventType = line.substring(6).trim();
+
+              // Next line should be data:
+              const dataLineIndex = lines.indexOf(line) + 1;
+              if (dataLineIndex < lines.length) {
+                const dataLine = lines[dataLineIndex];
+                if (dataLine.startsWith("data:")) {
+                  const dataStr = dataLine.substring(5).trim();
+
+                  try {
+                    const data = JSON.parse(dataStr);
+
+                    if (eventType === "meta") {
+                      routingInfo = data.routing;
+                      references = data.references || [];
+                    } else if (eventType === "clarification") {
+                      clarificationData = data;
+                    } else if (eventType === "content") {
+                      answer += data.chunk || "";
+                      process.stdout.write(data.chunk || "");
+                    }
+                  } catch (e) {
+                    // Skip parse errors
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
 
       // Handle Clarification
-      if (data.needsClarification) {
+      if (clarificationData) {
         console.log("\n" + chalk.yellow("❓ Clarification Needed:"));
-        console.log(data.clarification.message);
+        console.log(clarificationData.message);
         console.log(chalk.gray("\nOptions:"));
-        data.clarification.options.forEach((opt: any) => {
+        clarificationData.options?.forEach((opt: any) => {
           console.log(`- ${chalk.bold(opt.label)}: ${opt.description}`);
         });
         console.log(chalk.gray("\nTip: Use --source <id> to specify context."));
@@ -138,25 +190,27 @@ program
       }
 
       // Handle Routing Info
-      if (data.routing) {
+      if (routingInfo) {
         console.log(
           chalk.gray(
-            `\n[Router] Type: ${data.routing.queryType}, Source: ${data.routing.detectedSource} (${data.routing.confidence}%)`
+            `\n[Router] Type: ${routingInfo.queryType}, Source: ${routingInfo.detectedSource} (${routingInfo.confidence}%)`
           )
         );
-        if (data.routing.reasoning) {
+        if (routingInfo.reasoning) {
           console.log(
-            chalk.gray(`[Router] Reasoning: ${data.routing.reasoning}`)
+            chalk.gray(`[Router] Reasoning: ${routingInfo.reasoning}`)
           );
         }
       }
 
-      console.log("\n" + chalk.green("🤖 Answer:"));
-      console.log(data.answer);
+      if (!answer && !clarificationData) {
+        console.log("\n" + chalk.green("🤖 Answer:"));
+        console.log(answer || "No response received");
+      }
 
-      if (data.references && data.references.length > 0) {
+      if (references && references.length > 0) {
         console.log("\n" + chalk.yellow("📚 References:"));
-        data.references.forEach((ref: any, i: number) => {
+        references.forEach((ref: any, i: number) => {
           console.log(
             `${i + 1}. ${chalk.cyan(ref.title)} - ${chalk.gray(ref.url)}`
           );
@@ -229,13 +283,14 @@ program
           )}`
         );
 
-        const response = await fetch(`${API_URL}/api/v1/chat/auto`, {
+        const response = await fetch(`${API_URL}/api/v1/chat/auto/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: test.query,
             userId: "test_cli_user",
             userEmail: "test@cli.com",
+            stream: false, // Non-streaming for tests
           }),
         });
 

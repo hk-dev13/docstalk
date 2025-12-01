@@ -10,6 +10,7 @@ pnpm --filter @docstalk/types build
 pnpm --filter @docstalk/config build
 pnpm --filter @docstalk/rag build
 pnpm --filter @docstalk/ui build
+pnpm --filter @docstalk/cli build
 
 echo ""
 echo "🔧 Building applications..."
