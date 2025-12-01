@@ -1,99 +1,102 @@
 # New Documentation Sources - Scraping Guide
 
 **Date:** December 1, 2025  
-**Status:** Ready to Scrape  
-**Created Scrapers:** 4
+**Status:** Production Ready  
+**Method:** Unified Crawler (scrape-docs.ts)  
+**New Sources:** 4 (Docker, FastAPI, Vue.js, PostgreSQL)
 
 ---
 
-## 📋 Available New Scrapers
+## ✅ Production Approach
 
-### ✅ Created (Ready to Use)
+All documentation scraping uses **one unified crawler** (`scrape-docs.ts`) for:
 
-| Source         | File            | Ecosystem    | Priority    | Status   |
-| -------------- | --------------- | ------------ | ----------- | -------- |
-| **Docker**     | `docker.ts`     | cloud_infra  | ⭐⭐⭐ High | ✅ Ready |
-| **FastAPI**    | `fastapi.ts`    | python       | ⭐⭐⭐ High | ✅ Ready |
-| **Vue.js**     | `vue.ts`        | frontend_web | ⭐⭐ Medium | ✅ Ready |
-| **PostgreSQL** | `postgresql.ts` | database     | ⭐⭐ Medium | ✅ Ready |
+- ✅ Consistent interface
+- ✅ Auto-discovery of pages
+- ✅ Easy maintenance (1 file for 15+ sources)
+- ✅ Better coverage (finds all linked pages)
 
 ---
 
-## 🚀 How to Use Scrapers
+## 🆕 New Sources Added
 
-### Option 1: Individual Scraper (Development)
+| Source         | Ecosystem    | URL                  | Status   |
+| -------------- | ------------ | -------------------- | -------- |
+| **Docker**     | cloud_infra  | docs.docker.com      | ✅ Ready |
+| **FastAPI**    | python       | fastapi.tiangolo.com | ✅ Ready |
+| **Vue.js**     | frontend_web | vuejs.org            | ✅ Ready |
+| **PostgreSQL** | database     | postgresql.org/docs  | ✅ Ready |
+
+All integrated into `scrape-docs.ts` - no separate files needed!
+
+---
+
+## 🚀 How to Scrape (Production)
+
+### Step 1: Run Unified Scraper
 
 ```bash
-# Navigate to API directory
 cd apps/api
 
-# Run single scraper
-pnpm tsx scripts/scrape/sources/docker.ts
-pnpm tsx scripts/scrape/sources/fastapi.ts
-pnpm tsx scripts/scrape/sources/vue.ts
-pnpm tsx scripts/scrape/sources/postgresql.ts
+# Scrape new documentation sources
+pnpm scrape docker        # Auto-crawls ~120-150 pages
+pnpm scrape fastapi       # Auto-crawls ~80-100 pages
+pnpm scrape vue           # Auto-crawls ~90-120 pages
+pnpm scrape postgresql    # Auto-crawls ~100-150 pages
 ```
 
-### Option 2: Through Main Scraper (Production)
+**What happens:**
 
-Update `scripts/scrape/sources/scrape-docs.ts` dengan source baru:
-
-```typescript
-// Add to DOC_CONFIGS
-const DOC_CONFIGS = {
-  // ... existing configs ...
-
-  docker: {
-    name: "Docker",
-    scraper: () => import("./docker.js").then((m) => m.scrapeDocker()),
-  },
-  fastapi: {
-    name: "FastAPI",
-    scraper: () => import("./fastapi.js").then((m) => m.scrapeFastAPI()),
-  },
-  vue: {
-    name: "Vue.js",
-    scraper: () => import("./vue.js").then((m) => m.scrapeVue()),
-  },
-  postgresql: {
-    name: "PostgreSQL",
-    scraper: () => import("./postgresql.js").then((m) => m.scrapePostgreSQL()),
-  },
-};
-```
-
-Then run:
-
-```bash
-pnpm scrape docker
-pnpm scrape fastapi
-pnpm scrape vue
-pnpm scrape postgresql
-```
+- Crawler starts from configured start URLs
+- Auto-discovers pages via link following
+- Respects URL patterns (only relevant pages)
+- Generates chunks with smart filtering
+- Saves to `data/<source>-chunks.json`
 
 ---
 
 ## 📊 After Scraping: Database Setup
 
-### Step 1: Add to `doc_sources` Table
+### Step 2: Add to Database
 
 ```sql
--- Insert new sources
+-- Insert new sources into doc_sources table
 INSERT INTO doc_sources (id, name, base_url, ecosystem_id, description) VALUES
-('docker', 'Docker', 'https://docs.docker.com', 'cloud_infra', 'Containerization platform documentation'),
-('fastapi', 'FastAPI', 'https://fastapi.tiangolo.com', 'python', 'Modern Python web framework for building APIs'),
-('vue', 'Vue.js', 'https://vuejs.org', 'frontend_web', 'Progressive JavaScript framework'),
-('postgresql', 'PostgreSQL', 'https://www.postgresql.org/docs', 'database', 'Advanced open source database');
+('docker', 'Docker', 'https://docs.docker.com', 'cloud_infra',
+ 'Containerization platform documentation'),
+('fastapi', 'FastAPI', 'https://fastapi.tiangolo.com', 'python',
+ 'Modern Python web framework for building APIs'),
+('vue', 'Vue.js', 'https://vuejs.org', 'frontend_web',
+ 'Progressive JavaScript framework'),
+('postgresql', 'PostgreSQL', 'https://www.postgresql.org/docs', 'database',
+ 'Advanced open source relational database');
 ```
 
-### Step 2: Index to Qdrant
+### Step 3: Index to Qdrant
 
 ```bash
-# Run indexer for each source
+# After scraping succeeds, index each source
 pnpm index docker
 pnpm index fastapi
 pnpm index vue
 pnpm index postgresql
+```
+
+### Step 4: Verify & Test
+
+```bash
+# Test queries
+docstalk ask "How to build Docker containers?"
+# Should detect: cloud_infra ecosystem → docker
+
+docstalk ask "FastAPI async endpoints?"
+# Should detect: python ecosystem → fastapi
+
+docstalk ask "Vue 3 composition API?"
+# Should detect: frontend_web ecosystem → vue
+
+docstalk ask "PostgreSQL indexes?"
+# Should detect: database ecosystem → postgresql
 ```
 
 ---
@@ -196,41 +199,72 @@ After scraping and indexing, you should have:
 
 ---
 
-## 🛠️ Scraper Template
+## 🛠️ Adding New Sources
 
-To create new scrapers, copy `_template.ts` and follow this structure:
+To add new documentation sources, update `scrape-docs.ts`:
+
+### 1. Add Configuration
 
 ```typescript
-import { DocumentChunk } from "@docstalk/types";
-import puppeteer from "puppeteer";
-import TurndownService from "turndown";
+// In apps/api/scripts/scrape/sources/scrape-docs.ts
 
-const BASE_URL = "https://docs.example.com";
-const SECTIONS_TO_SCRAPE = ["/guide/", "/api/"];
+const DOC_CONFIGS = {
+  // ... existing sources ...
 
-export async function scrapeSource(): Promise<DocumentChunk[]> {
-  const browser = await puppeteer.launch({ headless: true });
-  const chunks: DocumentChunk[] = [];
+  // Add new source:
+  langchain: {
+    name: "LangChain",
+    baseUrl: "https://docs.langchain.com",
+    startUrls: ["https://docs.langchain.com/docs/get-started/introduction"],
+    urlPattern: /^https:\/\/docs\.langchain\.com\/docs/,
+    maxPages: 150,
+  },
+};
+```
 
-  // Scraping logic here
+### 2. Configuration Options
 
-  await browser.close();
-  return chunks;
+```typescript
+{
+  name: "Display Name",          // Shown in logs
+  baseUrl: "https://...",        // Base URL for relative links
+  startUrls: ["https://..."],    // Where to start crawling
+  urlPattern: /regex/,           // Which URLs to crawl
+  maxPages: 150,                 // Max pages to scrape
 }
+```
+
+### 3. Run Scraper
+
+```bash
+pnpm scrape langchain
+```
+
+### 4. Add to Database
+
+```sql
+INSERT INTO doc_sources (id, name, base_url, ecosystem_id, description) VALUES
+('langchain', 'LangChain', 'https://docs.langchain.com', 'ai_ml',
+ 'Framework for building LLM applications');
+```
+
+### 5. Index
+
+```bash
+pnpm index langchain
 ```
 
 ---
 
 ## ✅ Checklist for Adding New Source
 
-- [ ] Create scraper file in `scripts/scrape/sources/`
-- [ ] Test scraper: `pnpm tsx scripts/scrape/sources/your-source.ts`
-- [ ] Add to `scrape-docs.ts` DOC_CONFIGS
+- [ ] Add config to `scrape-docs.ts` DOC_CONFIGS
+- [ ] Test scraper: `pnpm scrape <source>`
+- [ ] Verify chunks in `data/<source>-chunks.json`
 - [ ] Insert into `doc_sources` table with correct ecosystem_id
-- [ ] Run scraper: `pnpm scrape your-source`
-- [ ] Run indexer: `pnpm index your-source`
-- [ ] Verify in Qdrant
-- [ ] Test queries via chat
+- [ ] Run indexer: `pnpm index <source>`
+- [ ] Verify in Qdrant dashboard
+- [ ] Test queries via chat or CLI
 
 ---
 
