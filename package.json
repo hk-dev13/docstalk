@@ -1,12 +1,14 @@
 {
   "name": "docstalk",
-  "version": "0.2.1-beta",
+  "version": "0.3.0-alpha",
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel -r dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "clean": "pnpm -r clean"
+    "clean": "pnpm -r clean",
+    "db:migrate": "tsx scripts/run-migration.ts",
+    "embeddings:generate": "tsx scripts/generate-ecosystem-embeddings.ts"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
@@ -30,5 +32,11 @@
       "sharp",
       "unrs-resolver"
     ]
+  },
+  "dependencies": {
+    "@google/genai": "^1.30.0",
+    "@supabase/supabase-js": "^2.86.0",
+    "dotenv": "^16.6.1",
+    "tsx": "^4.20.6"
   }
 }

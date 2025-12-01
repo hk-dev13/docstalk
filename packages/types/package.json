@@ -1,6 +1,6 @@
 {
   "name": "@docstalk/types",
-  "version": "0.2.1-beta",
+  "version": "0.3.0-alpha",
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
