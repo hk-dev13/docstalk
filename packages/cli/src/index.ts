@@ -33,23 +33,92 @@ if (!projectRoot) {
 
 program
   .command("scrape")
-  .description("Scrape documentation from a URL")
-  .argument("<url>", "URL to scrape")
-  .option("-i, --index", "Automatically index after scraping")
-  .action(async (url, options) => {
-    console.log(chalk.blue(`🕷️  Scraping ${url}...`));
+  .description("Scrape documentation from a source or URL")
+  .argument(
+    "<source_or_url>",
+    "Documentation source (e.g., react, nextjs) or specific URL"
+  )
+  .option("--index", "Automatically index after scraping")
+  .option(
+    "--incremental",
+    "Only scrape new/changed pages (compares with existing data)"
+  )
+  .option(
+    "--partial",
+    "Scrape specific URL(s) only and merge with existing chunks"
+  )
+  .action(async (sourceOrUrl, options) => {
+    const isUrl = sourceOrUrl.startsWith("http");
+    const mode = options.incremental
+      ? "incremental"
+      : options.partial
+      ? "partial"
+      : "full";
+
+    console.log(
+      chalk.blue(
+        `🕷️  Scraping ${isUrl ? "URL" : "source"}: ${sourceOrUrl} ${
+          mode !== "full" ? `(${mode} mode)` : ""
+        }`
+      )
+    );
+
     try {
-      await execa("pnpm", ["--filter", "@docstalk/api", "scrape", url], {
+      // Build command with flags
+      const args = ["--filter", "@docstalk/api", "scrape", sourceOrUrl];
+
+      if (options.incremental) {
+        args.push("--incremental");
+      }
+      if (options.partial) {
+        args.push("--partial");
+      }
+
+      await execa("pnpm", args, {
         cwd: projectRoot,
         stdio: "inherit",
       });
 
       if (options.index) {
-        console.log(chalk.blue(`\n📊 Auto-indexing ${url}...`));
-        await execa("pnpm", ["--filter", "@docstalk/api", "index", url], {
-          cwd: projectRoot,
-          stdio: "inherit",
-        });
+        console.log(chalk.blue(`\n📊 Auto-indexing ${sourceOrUrl}...`));
+
+        // Extract source name for indexing
+        let sourceName = sourceOrUrl;
+        if (isUrl) {
+          // Try to detect source from URL
+          const urlPatterns: Record<string, RegExp> = {
+            react: /react\.dev/,
+            nextjs: /nextjs\.org/,
+            typescript: /typescriptlang\.org/,
+            nodejs: /nodejs\.org/,
+            tailwind: /tailwindcss\.com/,
+            prisma: /prisma\.io/,
+            express: /expressjs\.com/,
+            python: /docs\.python\.org/,
+            rust: /doc\.rust-lang\.org/,
+            go: /go\.dev/,
+            docker: /docs\.docker\.com/,
+            fastapi: /fastapi\.tiangolo\.com/,
+            vue: /vuejs\.org/,
+            postgresql: /postgresql\.org/,
+          };
+
+          for (const [name, pattern] of Object.entries(urlPatterns)) {
+            if (pattern.test(sourceOrUrl)) {
+              sourceName = name;
+              break;
+            }
+          }
+        }
+
+        await execa(
+          "pnpm",
+          ["--filter", "@docstalk/api", "index", sourceName],
+          {
+            cwd: projectRoot,
+            stdio: "inherit",
+          }
+        );
       }
     } catch (error) {
       console.error(chalk.red("❌ Scraping or indexing failed"));
