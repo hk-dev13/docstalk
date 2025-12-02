@@ -98,7 +98,8 @@ const DOC_CONFIGS = {
       "https://docs.docker.com/guides/",
       "https://docs.docker.com/reference/",
     ],
-    urlPattern: /^https:\/\/docs\.docker\.com\/(get-started|guides|reference|engine|compose|build|desktop)/,
+    urlPattern:
+      /^https:\/\/docs\.docker\.com\/(get-started|guides|reference|engine|compose|build|desktop)/,
     maxPages: 150,
   },
   fastapi: {
@@ -108,7 +109,8 @@ const DOC_CONFIGS = {
       "https://fastapi.tiangolo.com/tutorial/",
       "https://fastapi.tiangolo.com/advanced/",
     ],
-    urlPattern: /^https:\/\/fastapi\.tiangolo\.com\/(tutorial|advanced|deployment|reference)/,
+    urlPattern:
+      /^https:\/\/fastapi\.tiangolo\.com\/(tutorial|advanced|deployment|reference)/,
     maxPages: 150,
   },
   vue: {
@@ -447,16 +449,37 @@ async function saveChunks(source: string, chunks: DocChunk[]) {
  * Main scraper function
  */
 async function main() {
-  const input = process.argv[2];
+  const args = process.argv.slice(2);
+  const input = args[0];
+
+  // Parse flags
+  const flags = {
+    incremental: args.includes("--incremental"),
+    partial: args.includes("--partial"),
+  };
 
   if (!input) {
-    console.error("Usage: pnpm scrape <source_or_url>");
+    console.error(
+      "Usage: pnpm scrape <source_or_url> [--incremental] [--partial]"
+    );
     console.error(`Available sources: ${Object.keys(DOC_CONFIGS).join(", ")}`);
-    console.error("Or provide a specific URL to scrape a single page.");
+    console.error("");
+    console.error("Flags:");
+    console.error(
+      "  --incremental  Only scrape new/changed pages (compares with existing data)"
+    );
+    console.error(
+      "  --partial      Scrape specific URL(s) only and merge with existing chunks"
+    );
+    console.error("");
+    console.error("Examples:");
+    console.error("  pnpm scrape react");
+    console.error("  pnpm scrape react --incremental");
+    console.error("  pnpm scrape https://react.dev/hooks/useState --partial");
     process.exit(1);
   }
 
-  // Check if input is a URL
+  // Check if input is a URL (partial mode)
   if (input.startsWith("http")) {
     const matchedKey = Object.keys(DOC_CONFIGS).find(
       (key) =>
@@ -467,7 +490,13 @@ async function main() {
     if (matchedKey) {
       const source = matchedKey as keyof typeof DOC_CONFIGS;
       console.log(`\n🚀 Detected source: ${DOC_CONFIGS[source].name}`);
-      console.log(`🎯 Scraping single page: ${input}\n`);
+      console.log(`🎯 Partial scrape: ${input}`);
+
+      if (flags.incremental) {
+        console.log(`⚡ Incremental mode: Will check if content changed\n`);
+      } else {
+        console.log(`📝 Partial mode: Will merge with existing chunks\n`);
+      }
 
       // Override config for single page scrape
       DOC_CONFIGS[source].startUrls = [input];
@@ -492,6 +521,26 @@ async function main() {
         existingChunks = JSON.parse(data);
       } catch (e) {
         // File might not exist, that's fine
+      }
+
+      // Incremental mode: Check if content changed
+      if (flags.incremental && existingChunks.length > 0) {
+        const existingForUrl = existingChunks.filter((c) => c.url === input);
+
+        if (existingForUrl.length > 0) {
+          // Compare content
+          const newContent = chunks.map((c) => c.content).join("\n");
+          const oldContent = existingForUrl.map((c) => c.content).join("\n");
+
+          if (newContent === oldContent) {
+            console.log(`✅ No changes detected for ${input}`);
+            console.log(`   Skipping update (content identical)\n`);
+            return;
+          } else {
+            console.log(`🔄 Changes detected for ${input}`);
+            console.log(`   Updating chunks...\n`);
+          }
+        }
       }
 
       // Filter out existing chunks for this URL to avoid duplicates
@@ -524,9 +573,83 @@ async function main() {
   }
 
   console.log(`\n🚀 DocsTalk Documentation Scraper\n`);
+  
+  if (flags.incremental) {
+    console.log(`⚡ Incremental mode: Will compare with existing data\n`);
+  }
 
   const chunks = await crawlDocumentation(source);
-  await saveChunks(source, chunks);
+  
+  // Incremental mode: Merge with existing chunks
+  if (flags.incremental) {
+    const outputDir = path.join(process.cwd(), "data");
+    const outputFile = path.join(outputDir, `${source}-chunks.json`);
+    
+    let existingChunks: DocChunk[] = [];
+    try {
+      const data = await fs.readFile(outputFile, "utf-8");
+      existingChunks = JSON.parse(data);
+    } catch (e) {
+      console.log(`  No existing data found, will create new file\n`);
+    }
+    
+    if (existingChunks.length > 0) {
+      console.log(`  📊 Comparing with ${existingChunks.length} existing chunks...`);
+      
+      // Group by URL for comparison
+      const existingByUrl = new Map<string, DocChunk[]>();
+      existingChunks.forEach(chunk => {
+        const urlChunks = existingByUrl.get(chunk.url) || [];
+        urlChunks.push(chunk);
+        existingByUrl.set(chunk.url, urlChunks);
+      });
+      
+      const newByUrl = new Map<string, DocChunk[]>();
+      chunks.forEach(chunk => {
+        const urlChunks = newByUrl.get(chunk.url) || [];
+        urlChunks.push(chunk);
+        newByUrl.set(chunk.url, urlChunks);
+      });
+      
+      // Merge strategy:
+      // 1. Keep existing chunks for URLs not in new crawl (unchanged pages)
+      // 2. Replace chunks for URLs that were re-scraped
+      const mergedChunks: DocChunk[] = [];
+      let unchangedCount = 0;
+      let changedCount = 0;
+      let newCount = 0;
+      
+      // Add all new/changed chunks
+      chunks.forEach(chunk => {
+        mergedChunks.push(chunk);
+        if (existingByUrl.has(chunk.url)) {
+          changedCount++;
+        } else {
+          newCount++;
+        }
+      });
+      
+      // Add unchanged existing chunks (not in new crawl)
+      existingChunks.forEach(chunk => {
+        if (!newByUrl.has(chunk.url)) {
+          mergedChunks.push(chunk);
+          unchangedCount++;
+        }
+      });
+      
+      console.log(`  ✅ Merge complete:`);
+      console.log(`     New pages: ${newCount}`);
+      console.log(`     Changed pages: ${changedCount}`);
+      console.log(`     Unchanged pages: ${unchangedCount}`);
+      console.log(`     Total chunks: ${mergedChunks.length}\n`);
+      
+      await saveChunks(source, mergedChunks);
+    } else {
+      await saveChunks(source, chunks);
+    }
+  } else {
+    await saveChunks(source, chunks);
+  }
 
   console.log(`\n✅ Done! Next step: pnpm index ${source}\n`);
 }
