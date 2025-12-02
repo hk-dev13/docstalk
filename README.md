@@ -42,11 +42,15 @@ DocsTalk now uses a **Hybrid Architecture** for maximum scalability and performa
 ## ✨ Key Features
 
 - **Ecosystem-Based Routing** ⭐ NEW: Hierarchical doc grouping with 10-250x faster detection
+- **Smart Scraping** 🆕: Incremental & partial modes for 5-60x faster updates
+- **Secure CLI** 🔒 NEW: Multi-layer authentication for developer commands
 - **Smart Auto-Detection**: Automatically identifies which documentation you're asking about
 - **Hybrid Search**: Combines keyword matching with semantic vector search
-- **Multi-Source Support**: Node.js, React, Next.js, TypeScript, Tailwind, Python, Go, Rust, and more
-- **CLI Auto-Indexing**: Scrape and index in one go: `docstalk scrape <source> --index`
+- **Multi-Source Support**: Node.js, React, Next.js, TypeScript, Tailwind, Python, Go, Rust, Docker, FastAPI, Vue, PostgreSQL
+- **Deterministic Indexing**: Stable chunk IDs for idempotent reindexing
+- **CLI Auto-Indexing**: Scrape and index in one go: `docstalk dev scrape <source> --index`
 - **RAG Powered**: Uses Google Gemini 2.5 Flash for accurate, context-aware answers
+- **Global Language Support**: Responds in user's query language (100+ languages)
 
 ## 🎯 Ecosystem-Based Routing (v0.3.0-alpha)
 

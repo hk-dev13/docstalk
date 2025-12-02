@@ -8,6 +8,24 @@ import { Calendar, Tag, GitCommit } from "lucide-react";
 export default function ChangelogPage() {
   const changes = [
     {
+      version: "v0.3.1-alpha",
+      date: "December 2, 2025",
+      title: "Smart Scraping, Security & Production Readiness",
+      type: "major",
+      items: [
+        "🔒 Multi-layer authentication for developer commands (DOCSTALK_ADMIN_TOKEN)",
+        "⚡ Incremental scraping mode with change detection (5-10x faster updates)",
+        "🎯 Partial scraping mode for surgical page updates (20-60x faster)",
+        "🔑 Deterministic chunk IDs (SHA-1) for idempotent reindexing",
+        "📊 Fixed split chunk indexing (unique indexes per subchunk)",
+        "🛠️ CLI command separation (public vs developer commands)",
+        "🆕 Added 4 new doc sources: Docker, FastAPI, Vue.js, PostgreSQL",
+        "🌍 Global language support (responds in user's query language)",
+        "📝 Comprehensive documentation for security and workflows",
+        "🚀 Production-ready infrastructure with 100% ecosystem coverage",
+      ],
+    },
+    {
       version: "v0.3.0-alpha",
       date: "December 1, 2025",
       title: "Ecosystem-Based Hierarchical Routing Foundation",
