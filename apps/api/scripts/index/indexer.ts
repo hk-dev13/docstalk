@@ -159,7 +159,7 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
 
           // Extract metadata fields
           const baseChunkIndex = chunk.metadata?.chunkIndex || 0;
-          
+
           // FIXED: Proper chunk indexing for split chunks
           // Each subchunk gets unique index: baseIndex * 1000 + subIdx
           // This maintains sort order and prevents index collision
@@ -171,13 +171,30 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
               ? `${chunk.title} (Part ${subIdx + 1}/${subChunks.length})`
               : chunk.title;
 
-          // FIXED: Deterministic chunk ID using content hash
-          // This allows idempotent reindexing and incremental updates
-          // Format: sha1(source:url:baseIndex:subIdx)
-          const chunkId = crypto
+          // FIXED: Deterministic chunk ID using UUID v5 format
+          // Qdrant requires proper UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+          // We create deterministic UUID from content hash
+          const chunkIdInput = `${source}:${chunk.url}:${baseChunkIndex}:${subIdx}`;
+
+          // Generate SHA-1 hash (40 hex chars = 160 bits)
+          const hash = crypto
             .createHash("sha1")
-            .update(`${source}:${chunk.url}:${baseChunkIndex}:${subIdx}`)
+            .update(chunkIdInput)
             .digest("hex");
+
+          // Convert to UUID v5 format (128 bits)
+          // Format: xxxxxxxx-xxxx-5xxx-yxxx-xxxxxxxxxxxx
+          // Take first 32 hex chars (128 bits) from hash
+          const chunkId = [
+            hash.substring(0, 8), // 8 hex chars
+            hash.substring(8, 12), // 4 hex chars
+            "5" + hash.substring(13, 16), // version 5 + 3 hex chars
+            ((parseInt(hash.substring(16, 18), 16) & 0x3f) | 0x80).toString(
+              16
+            ) + hash.substring(18, 20), // variant + 2 hex chars
+            hash.substring(20, 32), // 12 hex chars
+          ].join("-");
+          // Result: valid UUID v5 format, deterministic, same input = same UUID
 
           // 1. Upsert to Qdrant (Vector + Content)
           await qdrant.upsertPoints([

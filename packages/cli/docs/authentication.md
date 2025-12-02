@@ -1,6 +1,6 @@
 # DocsTalk CLI - Authentication & Security
 
-**Version:** 0.3.0-alpha  
+**Version:** 0.3.1-alpha  
 **Updated:** December 2, 2025  
 **Security Level:** Multi-Layer Protection
 
