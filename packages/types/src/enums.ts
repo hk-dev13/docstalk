@@ -2,12 +2,10 @@
  * Shared Enums
  */
 
-export enum SupportedDoc {
-  NEXTJS = "nextjs",
-  REACT = "react",
-  TYPESCRIPT = "typescript",
-}
-
+/**
+ * Response mode for AI personas
+ * Controls how the AI responds to queries
+ */
 export enum ResponseMode {
   AUTO = 'auto',
   FRONTEND = "frontend",
