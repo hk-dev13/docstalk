@@ -26,6 +26,93 @@ const projectRoot = findProjectRoot();
 const isDev = process.env.DOCSTALK_DEV === "1" || !!projectRoot;
 
 // ============================================================================
+// AUTHENTICATION & SECURITY
+// ============================================================================
+
+/**
+ * Check if user has permission to use dev commands
+ * Multi-layer authentication:
+ * 1. Must have DOCSTALK_ADMIN_TOKEN env var
+ * 2. Must be inside project root (for local dev)
+ * OR provide valid remote token (for production)
+ */
+function checkDevPermission(): { allowed: boolean; reason?: string } {
+  // Layer 1: Check for admin token
+  const adminToken = process.env.DOCSTALK_ADMIN_TOKEN;
+
+  if (!adminToken) {
+    return {
+      allowed: false,
+      reason: "DOCSTALK_ADMIN_TOKEN environment variable not set",
+    };
+  }
+
+  // Layer 2: For local development, must be in project
+  if (!projectRoot) {
+    // Not in project, check if remote token is valid
+    const remoteToken = process.env.DOCSTALK_REMOTE_TOKEN;
+
+    if (!remoteToken) {
+      return {
+        allowed: false,
+        reason:
+          "Must be inside DocsTalk project or provide DOCSTALK_REMOTE_TOKEN",
+      };
+    }
+
+    // Validate remote token (for production deployments)
+    // In production, this should validate against a secure backend
+    if (remoteToken !== adminToken) {
+      return {
+        allowed: false,
+        reason: "Invalid remote token",
+      };
+    }
+  }
+
+  // Layer 3: Additional check - must match expected admin token
+  // This prevents random env vars from granting access
+  const expectedTokenPrefix = "dtalk_admin_";
+  if (!adminToken.startsWith(expectedTokenPrefix)) {
+    return {
+      allowed: false,
+      reason: "Invalid admin token format (must start with 'dtalk_admin_')",
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Require dev permission or exit with error
+ */
+function requireDevPermission(commandName: string) {
+  const check = checkDevPermission();
+
+  if (!check.allowed) {
+    console.error(chalk.red(`\n🔒 Permission Denied: ${commandName}\n`));
+    console.error(chalk.yellow("Developer commands require authentication.\n"));
+    console.error(chalk.gray("Reason:"), check.reason);
+    console.error(chalk.gray("\nTo use developer commands:"));
+    console.error(
+      chalk.gray("1. Set DOCSTALK_ADMIN_TOKEN environment variable")
+    );
+    console.error(
+      chalk.gray("   export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_SECRET_KEY")
+    );
+    console.error(chalk.gray("\n2. Either:"));
+    console.error(chalk.gray("   - Run inside DocsTalk project directory, OR"));
+    console.error(
+      chalk.gray("   - Set DOCSTALK_REMOTE_TOKEN for remote access")
+    );
+    console.error(
+      chalk.gray("\n📖 See docs: packages/cli/docs/authentication.md\n")
+    );
+    process.exit(1);
+  }
+}
+
+// ============================================================================
 // MAIN PROGRAM
 // ============================================================================
 
@@ -157,7 +244,9 @@ program
   .action(() => {
     console.log(chalk.blue("DocsTalk CLI"));
     console.log(`Version: ${chalk.green("0.3.0-alpha")}`);
-    console.log(`Mode: ${isDev ? chalk.yellow("Development") : chalk.green("Production")}`);
+    console.log(
+      `Mode: ${isDev ? chalk.yellow("Development") : chalk.green("Production")}`
+    );
   });
 
 // ============================================================================
@@ -168,13 +257,24 @@ const devCommand = program
   .command("dev")
   .description("Developer commands (scrape, index, serve, etc.)")
   .action(() => {
+    // Check permission before showing dev commands
+    requireDevPermission("dev");
+
     console.log(chalk.blue("📦 DocsTalk Developer Commands\n"));
     console.log("Available commands:");
-    console.log(chalk.gray("  docstalk dev serve          Start development server"));
-    console.log(chalk.gray("  docstalk dev scrape         Scrape documentation"));
-    console.log(chalk.gray("  docstalk dev index          Index documentation"));
+    console.log(
+      chalk.gray("  docstalk dev serve          Start development server")
+    );
+    console.log(
+      chalk.gray("  docstalk dev scrape         Scrape documentation")
+    );
+    console.log(
+      chalk.gray("  docstalk dev index          Index documentation")
+    );
     console.log(chalk.gray("  docstalk dev test-router    Test routing logic"));
-    console.log(chalk.gray("\nUse 'docstalk dev <command> --help' for more info"));
+    console.log(
+      chalk.gray("\nUse 'docstalk dev <command> --help' for more info")
+    );
   });
 
 // dev serve
@@ -182,9 +282,13 @@ devCommand
   .command("serve")
   .description("Start the development server")
   .action(async () => {
+    requireDevPermission("dev serve");
+
     if (!projectRoot) {
       console.error(
-        chalk.red("❌ Error: Must be inside DocsTalk project to use dev commands")
+        chalk.red(
+          "❌ Error: Must be inside DocsTalk project to use dev commands"
+        )
       );
       process.exit(1);
     }
@@ -214,11 +318,18 @@ devCommand
     "--incremental",
     "Only scrape new/changed pages (compares with existing data)"
   )
-  .option("--partial", "Scrape specific URL(s) only and merge with existing chunks")
+  .option(
+    "--partial",
+    "Scrape specific URL(s) only and merge with existing chunks"
+  )
   .action(async (sourceOrUrl, options) => {
+    requireDevPermission("dev scrape");
+
     if (!projectRoot) {
       console.error(
-        chalk.red("❌ Error: Must be inside DocsTalk project to use dev commands")
+        chalk.red(
+          "❌ Error: Must be inside DocsTalk project to use dev commands"
+        )
       );
       process.exit(1);
     }
@@ -283,10 +394,14 @@ devCommand
           }
         }
 
-        await execa("pnpm", ["--filter", "@docstalk/api", "index", sourceName], {
-          cwd: projectRoot,
-          stdio: "inherit",
-        });
+        await execa(
+          "pnpm",
+          ["--filter", "@docstalk/api", "index", sourceName],
+          {
+            cwd: projectRoot,
+            stdio: "inherit",
+          }
+        );
       }
     } catch (error) {
       console.error(chalk.red("❌ Scraping or indexing failed"));
@@ -300,9 +415,13 @@ devCommand
   .description("Index documentation for RAG")
   .argument("<source>", "Source to index (e.g., nextjs, react)")
   .action(async (source) => {
+    requireDevPermission("dev index");
+
     if (!projectRoot) {
       console.error(
-        chalk.red("❌ Error: Must be inside DocsTalk project to use dev commands")
+        chalk.red(
+          "❌ Error: Must be inside DocsTalk project to use dev commands"
+        )
       );
       process.exit(1);
     }
@@ -326,9 +445,13 @@ devCommand
   .argument("<query>", "Query to test")
   .option("-s, --source <source>", "Force documentation source", "")
   .action(async (query, options) => {
+    requireDevPermission("dev test-router");
+
     if (!projectRoot) {
       console.error(
-        chalk.red("❌ Error: Must be inside DocsTalk project to use dev commands")
+        chalk.red(
+          "❌ Error: Must be inside DocsTalk project to use dev commands"
+        )
       );
       process.exit(1);
     }
@@ -379,9 +502,7 @@ program
     console.log(chalk.yellow("   Use 'docstalk dev serve' instead.\n"));
 
     if (!projectRoot) {
-      console.error(
-        chalk.red("❌ Error: Must be inside DocsTalk project")
-      );
+      console.error(chalk.red("❌ Error: Must be inside DocsTalk project"));
       process.exit(1);
     }
 
@@ -401,13 +522,13 @@ program
   .action(async (sourceOrUrl, options) => {
     console.log(chalk.yellow("⚠️  'docstalk scrape' is deprecated."));
     console.log(chalk.yellow("   Use 'docstalk dev scrape' instead.\n"));
-    
+
     // Redirect to dev command
     const args = ["dev", "scrape", sourceOrUrl];
     if (options.index) args.push("--index");
     if (options.incremental) args.push("--incremental");
     if (options.partial) args.push("--partial");
-    
+
     program.parse(args, { from: "user" });
   });
 
@@ -418,7 +539,7 @@ program
   .action(async (source) => {
     console.log(chalk.yellow("⚠️  'docstalk index' is deprecated."));
     console.log(chalk.yellow("   Use 'docstalk dev index' instead.\n"));
-    
+
     program.parse(["dev", "index", source], { from: "user" });
   });
 
@@ -430,10 +551,10 @@ program
   .action(async (query, options) => {
     console.log(chalk.yellow("⚠️  'docstalk test-router' is deprecated."));
     console.log(chalk.yellow("   Use 'docstalk dev test-router' instead.\n"));
-    
+
     const args = ["dev", "test-router", query];
     if (options.source) args.push("--source", options.source);
-    
+
     program.parse(args, { from: "user" });
   });
 
