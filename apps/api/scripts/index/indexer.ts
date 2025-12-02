@@ -158,7 +158,12 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
           const embedding = await generateEmbedding(subContent);
 
           // Extract metadata fields
-          const chunkIndex = chunk.metadata?.chunkIndex || 0;
+          const baseChunkIndex = chunk.metadata?.chunkIndex || 0;
+          
+          // FIXED: Proper chunk indexing for split chunks
+          // Each subchunk gets unique index: baseIndex * 1000 + subIdx
+          // This maintains sort order and prevents index collision
+          const actualChunkIndex = baseChunkIndex * 1000 + subIdx;
 
           // Create title with part indicator if split
           const title =
@@ -166,8 +171,13 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
               ? `${chunk.title} (Part ${subIdx + 1}/${subChunks.length})`
               : chunk.title;
 
-          // Generate UUID for the chunk
-          const chunkId = crypto.randomUUID();
+          // FIXED: Deterministic chunk ID using content hash
+          // This allows idempotent reindexing and incremental updates
+          // Format: sha1(source:url:baseIndex:subIdx)
+          const chunkId = crypto
+            .createHash("sha1")
+            .update(`${source}:${chunk.url}:${baseChunkIndex}:${subIdx}`)
+            .digest("hex");
 
           // 1. Upsert to Qdrant (Vector + Content)
           await qdrant.upsertPoints([
@@ -179,7 +189,7 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
                 url: chunk.url,
                 title: title,
                 content: subContent,
-                chunk_index: chunkIndex,
+                chunk_index: actualChunkIndex,
                 ...chunk.metadata,
                 splitPart: subChunks.length > 1 ? subIdx + 1 : undefined,
                 totalParts: subChunks.length > 1 ? subChunks.length : undefined,
@@ -197,7 +207,7 @@ async function indexChunks(source: string, chunks: DocChunk[]) {
                 url: chunk.url,
                 title: title,
                 source: chunk.source,
-                chunk_index: chunkIndex,
+                chunk_index: actualChunkIndex,
               });
 
               if (error) throw error;

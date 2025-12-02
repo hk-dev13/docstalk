@@ -1,9 +1,6 @@
 -- WARNING: This schema is for context only and already exists in the database and is not meant to be run again.
 -- Table order and constraints may not be valid for execution.
 
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
 CREATE TABLE public.context_switches (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   conversation_id uuid NOT NULL,
@@ -41,6 +38,25 @@ CREATE TABLE public.doc_chunk_meta (
   qdrant_id uuid,
   CONSTRAINT doc_chunk_meta_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.doc_ecosystems (
+  id text NOT NULL,
+  name text NOT NULL,
+  description text NOT NULL,
+  color text NOT NULL,
+  icon text NOT NULL,
+  keywords ARRAY NOT NULL DEFAULT '{}'::text[],
+  aliases ARRAY DEFAULT '{}'::text[],
+  keyword_groups jsonb DEFAULT '{}'::jsonb,
+  detection_confidence_threshold double precision DEFAULT 0.6 CHECK (detection_confidence_threshold >= 0::double precision AND detection_confidence_threshold <= 1::double precision),
+  avg_detection_confidence double precision DEFAULT 0.0 CHECK (avg_detection_confidence >= 0::double precision AND avg_detection_confidence <= 1::double precision),
+  total_detections integer DEFAULT 0 CHECK (total_detections >= 0),
+  priority integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  description_embedding USER-DEFINED,
+  CONSTRAINT doc_ecosystems_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.doc_sources (
   id text NOT NULL,
   name text NOT NULL,
@@ -57,7 +73,23 @@ CREATE TABLE public.doc_sources (
   keywords ARRAY DEFAULT '{}'::text[],
   official_url text,
   icon_url text,
-  CONSTRAINT doc_sources_pkey PRIMARY KEY (id)
+  ecosystem_id text,
+  CONSTRAINT doc_sources_pkey PRIMARY KEY (id),
+  CONSTRAINT doc_sources_ecosystem_id_fkey FOREIGN KEY (ecosystem_id) REFERENCES public.doc_ecosystems(id)
+);
+CREATE TABLE public.ecosystem_routing_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  conversation_id uuid,
+  ecosystem_id text,
+  query text NOT NULL,
+  confidence double precision CHECK (confidence >= 0::double precision AND confidence <= 100::double precision),
+  doc_sources_used ARRAY DEFAULT '{}'::text[],
+  detection_stage text,
+  latency_ms integer,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ecosystem_routing_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT ecosystem_routing_logs_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id),
+  CONSTRAINT ecosystem_routing_logs_ecosystem_id_fkey FOREIGN KEY (ecosystem_id) REFERENCES public.doc_ecosystems(id)
 );
 CREATE TABLE public.messages (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
