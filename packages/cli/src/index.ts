@@ -121,7 +121,7 @@ const program = new Command();
 program
   .name("docstalk")
   .description("AI-powered documentation assistant")
-  .version("0.3.0-alpha");
+  .version("0.3.1-alpha");
 
 // ============================================================================
 // PUBLIC COMMANDS (Always visible to end users)
@@ -243,7 +243,7 @@ program
   .description("Show version information")
   .action(() => {
     console.log(chalk.blue("DocsTalk CLI"));
-    console.log(`Version: ${chalk.green("0.3.0-alpha")}`);
+    console.log(`Version: ${chalk.green("0.3.1-alpha")}`);
     console.log(
       `Mode: ${isDev ? chalk.yellow("Development") : chalk.green("Production")}`
     );
