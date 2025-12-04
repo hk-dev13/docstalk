@@ -263,7 +263,8 @@ export class RAGService {
   private async generateEmbedding(text: string): Promise<number[]> {
     const result = await this.client.models.embedContent({
       model: "text-embedding-004",
-      contents: [text], // API requires array of strings, not single string
+      // SDK v1.30.0: Use 'content' (singular) not 'contents'
+      content: text,
     });
 
     // New SDK returns result.embeddings[0].values
