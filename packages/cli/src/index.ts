@@ -5,6 +5,7 @@ import { execa } from "execa";
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
+import { saveConfig, getConfig, getToken } from "./config.js";
 
 // ============================================================================
 // HELPERS
@@ -168,6 +169,19 @@ function showHelp() {
   console.log(
     chalk.gray("    docstalk search <query>      Search documentation")
   );
+  console.log(
+    chalk.gray(
+      "    docstalk sources             List available documentation sources"
+    )
+  );
+  console.log(
+    chalk.gray("    docstalk login <token>       Login with API token")
+  );
+  console.log(
+    chalk.gray(
+      "    docstalk logout              Logout and remove stored token"
+    )
+  );
   console.log(chalk.gray("    docstalk version             Show version info"));
   console.log(chalk.gray("    docstalk help                Show this help\n"));
 
@@ -185,8 +199,9 @@ function showHelp() {
   );
 
   console.log(chalk.white.bold("💡 Examples:\n"));
-  console.log(chalk.gray('  $ docstalk ask "how to use react hooks?"'));
+  console.log(chalk.gray('  $ docstalk ask "how to use hooks"'));
   console.log(chalk.gray('  $ docstalk ask "docker compose" --source docker'));
+  console.log(chalk.gray("  $ docstalk login eyJhbGciOi..."));
   console.log(chalk.gray("  $ docstalk dev scrape react --incremental\n"));
 
   console.log(chalk.white.bold("🔗 More Info:\n"));
@@ -207,9 +222,58 @@ const program = new Command();
 program
   .name("docstalk")
   .description("AI-powered documentation assistant")
-  .version("0.3.1-alpha", "-v, --version", "Show version")
-  .helpOption("-h, --help", "Show help")
-  .addHelpCommand(false); // Disable default help, use custom
+  .version("0.3.1-alpha", "-v, --version", "Show version");
+
+// ============================================================================
+// CONFIG COMMANDS
+// ============================================================================
+
+program
+  .command("login")
+  .description("Login with your API token")
+  .argument("<token>", "Your DocsTalk API Token")
+  .action((token) => {
+    saveConfig({ token });
+    console.log(chalk.green("\n✅ Successfully logged in!"));
+    console.log(chalk.gray("Token saved to ~/.docstalk/config.json"));
+  });
+
+program
+  .command("logout")
+  .description("Logout and remove stored token")
+  .action(() => {
+    saveConfig({ token: undefined });
+    console.log(chalk.green("\n✅ Successfully logged out!"));
+  });
+
+program
+  .command("sources")
+  .description("List available documentation sources")
+  .action(() => {
+    console.log(chalk.blue("📚 Available Documentation Sources:\n"));
+    const sources = [
+      "nextjs",
+      "react",
+      "typescript",
+      "nodejs",
+      "tailwind",
+      "prisma",
+      "express",
+      "python",
+      "rust",
+      "go",
+      "docker",
+      "fastapi",
+      "vue",
+      "postgresql",
+    ];
+    sources.forEach((source) => {
+      console.log(chalk.gray(`  - ${source}`));
+    });
+    console.log("");
+  });
+
+program.helpOption("-h, --help", "Show help").addHelpCommand(false); // Disable default help, use custom
 
 // Custom help command
 program
@@ -239,6 +303,16 @@ program
 
     try {
       const url = process.env.DOCSTALK_API_URL || "http://localhost:3001";
+      const token = process.env.DOCSTALK_API_TOKEN;
+
+      if (!token) {
+        console.warn(
+          chalk.yellow(
+            "⚠️  Warning: DOCSTALK_API_TOKEN not set. Request may fail if authentication is required."
+          )
+        );
+      }
+
       const endpoint = `${url}/api/v1/chat/auto/stream`;
 
       // Prepare request body
@@ -254,6 +328,7 @@ program
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(body),
       });
@@ -552,6 +627,7 @@ devCommand
 
     try {
       const url = process.env.DOCSTALK_API_URL || "http://localhost:3001";
+      const token = getToken();
       const endpoint = `${url}/api/v1/chat/auto/stream`;
 
       const body = {
@@ -562,7 +638,10 @@ devCommand
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(body),
       });
 

@@ -86,10 +86,30 @@ export class QdrantService {
   /**
    * Search for similar chunks
    */
-  async search(vector: number[], limit: number = 5, filterSource?: string) {
+  async search(
+    vector: number[],
+    limit: number = 5,
+    filterSource?: string | string[]
+  ) {
     try {
-      const filter = filterSource
-        ? {
+      let filter: any = undefined;
+
+      if (filterSource) {
+        if (Array.isArray(filterSource)) {
+          // Filter by multiple sources (OR condition)
+          filter = {
+            must: [
+              {
+                key: "source",
+                match: {
+                  any: filterSource,
+                },
+              },
+            ],
+          };
+        } else {
+          // Filter by single source
+          filter = {
             must: [
               {
                 key: "source",
@@ -98,8 +118,9 @@ export class QdrantService {
                 },
               },
             ],
-          }
-        : undefined;
+          };
+        }
+      }
 
       const results = await this.client.search(this.COLLECTION_NAME, {
         vector,

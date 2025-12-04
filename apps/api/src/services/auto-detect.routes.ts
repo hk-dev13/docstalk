@@ -157,30 +157,28 @@ export async function registerAutoDetectRoutes(
           })}\n\n`
         );
 
-        let streamGenerator;
-
-        if (additionalSources.length > 0) {
-          // Multi-source stream
-          streamGenerator = ragService.generateMultiSourceAnswerStream(
-            query,
-            [primarySource, ...additionalSources],
-            history,
-            "auto"
-          );
-        } else {
-          // Single source stream (with router integration)
-          streamGenerator = ragService.generateAnswerStream(
-            query,
-            primarySource === "general" ? undefined : primarySource,
-            history,
-            "auto"
-          );
-        }
-
         // Stream content chunks
-        for await (const chunk of streamGenerator) {
-          reply.raw.write(`event: content\n`);
-          reply.raw.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        const streamGenerator = ragService.generateAnswerStream(
+          query,
+          additionalSources.length > 0
+            ? [primarySource, ...additionalSources]
+            : primarySource === "general"
+            ? undefined
+            : primarySource,
+          history,
+          "auto"
+        );
+
+        for await (const part of streamGenerator) {
+          if (part.type === "content") {
+            reply.raw.write(`event: content\n`);
+            reply.raw.write(
+              `data: ${JSON.stringify({ chunk: part.text })}\n\n`
+            );
+          } else if (part.type === "references") {
+            reply.raw.write(`event: references\n`);
+            reply.raw.write(`data: ${JSON.stringify(part.data)}\n\n`);
+          }
         }
 
         // Send done event

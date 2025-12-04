@@ -35,6 +35,8 @@ interface ChatMessageProps {
   onRegenerate?: () => void;
   reasoning?: string;
   queryType?: "meta" | "specific" | "ambiguous";
+  onFeedback?: (type: "up" | "down", reason?: string) => void;
+  onShare?: () => void;
 }
 
 export function ChatMessage({
@@ -45,6 +47,8 @@ export function ChatMessage({
   onRegenerate,
   reasoning,
   queryType,
+  onFeedback,
+  onShare,
 }: ChatMessageProps) {
   const isUser = role === "user";
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
@@ -110,11 +114,9 @@ export function ChatMessage({
   };
 
   const submitFeedback = () => {
-    // In a real app, you would send this to your backend
-    console.log("Feedback submitted:", {
-      type: "down",
-      reason: feedbackReason,
-    });
+    if (onFeedback) {
+      onFeedback("down", feedbackReason);
+    }
     setShowFeedbackInput(false);
     setFeedbackReason("");
     setShowThankYou(true);
@@ -397,6 +399,7 @@ export function ChatMessage({
                       <RefreshCw className="h-4 w-4" />
                     </button>
                     <button
+                      onClick={onShare}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                       title="Share"
                     >

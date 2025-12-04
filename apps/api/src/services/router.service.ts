@@ -9,7 +9,9 @@ import type {
   SessionContext,
   ContextSwitch,
   RouterConfig,
+  EcosystemDetectionResult,
 } from "@docstalk/types";
+import { EcosystemService } from "./ecosystem.service.js";
 
 /**
  * RouterService - AI Router for automatic doc source detection
@@ -19,6 +21,7 @@ export class RouterService {
   private client: GoogleGenAI;
   private supabase: SupabaseClient;
   private config: RouterConfig;
+  private ecosystemService: EcosystemService;
 
   // Cache sederhana untuk menghindari spam request ke DB saat mengambil instructions
   private sourceCache: Map<string, DocSourceMetadata> = new Map();
@@ -32,6 +35,7 @@ export class RouterService {
       enableMultiSource: config?.enableMultiSource ?? true,
       cacheContextDecisions: config?.cacheContextDecisions ?? true,
     };
+    this.ecosystemService = new EcosystemService(supabase);
   }
 
   /**
@@ -141,6 +145,22 @@ export class RouterService {
     conversationId?: string
   ): Promise<RoutingDecision> {
     try {
+      // 1. Ecosystem Detection (Priority)
+      const ecosystemResult = await this.ecosystemService.detectEcosystem(
+        query
+      );
+
+      if (ecosystemResult.confidence > 80) {
+        return {
+          queryType: "specific",
+          primarySource: ecosystemResult.ecosystem.id, // Or map to specific doc source if needed
+          confidence: ecosystemResult.confidence,
+          reasoning: `Ecosystem detected: ${ecosystemResult.ecosystem.name} (${ecosystemResult.reasoning})`,
+          needsClarification: false,
+          suggestedSources: ecosystemResult.suggestedDocSources,
+        };
+      }
+
       const availableDocSources = await this.getAvailableDocSources();
 
       let sessionContext: SessionContext | null = null;
@@ -196,11 +216,7 @@ export class RouterService {
 
     const sessionText =
       sessionContext && sessionContext.switchCount > 0
-        ? `\n\nSession Context:\nUser has switched contexts ${
-            sessionContext.switchCount
-          } times. Current: ${sessionContext.currentSource}. Previous: ${
-            sessionContext.previousSource
-          }. Analyze query independently.`
+        ? `\n\nSession Context:\nUser has switched contexts ${sessionContext.switchCount} times. Current: ${sessionContext.currentSource}. Previous: ${sessionContext.previousSource}. Analyze query independently.`
         : "\n\nThis is the first query in the conversation.";
 
     // Dynamically list all sources from DB
@@ -262,8 +278,7 @@ ${sourcesList}
         additionalSources: detection.suggestedSources.slice(1),
         confidence: 85,
         reasoning:
-          detection.reasoning +
-          " (Auto-resolved ambiguity with multi-source)",
+          detection.reasoning + " (Auto-resolved ambiguity with multi-source)",
         needsClarification: false,
         suggestedSources: detection.suggestedSources,
       };

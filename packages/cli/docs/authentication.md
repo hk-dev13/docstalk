@@ -14,13 +14,22 @@ Developer commands (`docstalk dev *`) are **protected** with token-based authent
 
 ## 🛡️ Security Design
 
-### Layer 1: Admin Token
+### Layer 1: Admin Token (Developer Commands)
 
 **Required:** `DOCSTALK_ADMIN_TOKEN`
 
 **Format:** Must start with `dtalk_admin_`
 
-**Purpose:** Primary authentication credential
+**Purpose:** Protects developer commands (scrape, index)
+
+---
+
+### Layer 1.5: API Token (User Commands)
+
+**Required:** `DOCSTALK_API_TOKEN`
+
+**Purpose:** Authenticates `ask` command against the secured backend.
+**Source:** Get this from your Clerk session (or sign in via Web UI).
 
 ---
 
@@ -385,7 +394,7 @@ docstalk dev test-router  # 🔒 Auth required
 These commands work without authentication:
 
 ```bash
-docstalk ask <query>      # ✅ Public
+docstalk ask <query>      # 🔒 Requires DOCSTALK_API_TOKEN
 docstalk search <query>   # ✅ Public
 docstalk version          # ✅ Public
 docstalk help             # ✅ Public

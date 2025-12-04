@@ -11,6 +11,7 @@ import {
   getUserConversations,
   getConversationMessages,
   saveMessage,
+  submitFeedback,
   updateConversation,
   getSessionContext,
   type RoutingMetadata,
@@ -404,6 +405,24 @@ export default function ChatPage() {
             console.log("State updated. ShowClarification should be true.");
             return;
 
+
+
+          case "references":
+            const references = event.data as Array<{
+              title: string;
+              url: string;
+              snippet: string;
+            }>;
+            setMessages((prev) => [
+              ...prev.slice(0, -1),
+              {
+                ...assistantMessage,
+                content: fullResponse,
+                references,
+              },
+            ]);
+            break;
+
           case "content":
             const chunk = (event.data as { chunk: string }).chunk;
             fullResponse += chunk;
@@ -426,13 +445,32 @@ export default function ChatPage() {
       // Post-stream actions
 
       // 1. Save assistant message for authenticated users
-      if (user && token && conversationId && fullResponse) {
-        await saveMessage(
+      // Save assistant message
+      if (token && conversationId) {
+        // Extract references from the last message state
+        const finalReferences = assistantMessage.references;
+        
+        const saveResult = await saveMessage(
           conversationId,
           "assistant",
           fullResponse,
-          token
-        ).catch(console.error);
+          token,
+          finalReferences,
+          undefined // tokensUsed not available from stream yet
+        );
+
+        // Update message with ID for feedback
+        if (saveResult && saveResult.messageId) {
+          setMessages((prev) => [
+            ...prev.slice(0, -1),
+            {
+              ...assistantMessage,
+              content: fullResponse,
+              references: finalReferences,
+              id: saveResult.messageId, // Store ID
+            } as any,
+          ]);
+        }
       }
 
       // 2. Increment guest counter
@@ -490,6 +528,64 @@ export default function ChatPage() {
     }
   };
 
+  const handleFeedback = async (
+    messageId: string,
+    type: "up" | "down",
+    reason?: string
+  ) => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      await submitFeedback(messageId, type, token, reason);
+      console.log("Feedback submitted successfully");
+    } catch (error) {
+      console.error("Failed to submit feedback:", error);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (isStreaming) return;
+    
+    // Find last assistant message index
+    const lastMsgIndex = messages.length - 1;
+    if (lastMsgIndex < 0) return;
+    
+    const lastMsg = messages[lastMsgIndex];
+    if (lastMsg.role !== "assistant") return;
+
+    // Find the preceding user message
+    const userMsgIndex = lastMsgIndex - 1;
+    if (userMsgIndex < 0 || messages[userMsgIndex].role !== "user") return;
+
+    const userQuery = messages[userMsgIndex].content;
+
+    // Remove the last assistant message
+    setMessages((prev) => prev.slice(0, -1));
+
+    // Re-send the query, skipping adding the user message again
+    await handleAutoDetectSend(userQuery, undefined, true);
+  };
+
+  const handleShare = async (content: string) => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "DocsTalk Response",
+          text: content,
+        });
+      } catch (error) {
+        console.error("Error sharing:", error);
+      }
+    } else {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(content);
+      // You might want to add a toast here if available, or just rely on the user noticing
+      // For now we'll just log it as we don't have a toast component ready
+      console.log("Shared to clipboard");
+    }
+  };
+
   return (
     <div
       className="flex h-screen bg-background overflow-hidden"
@@ -518,9 +614,8 @@ export default function ChatPage() {
         <header className="glass-header px-6 py-3">
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* 👇 TAMBAHKAN TOMBOL INI (Hanya muncul di Mobile) 👇 */}
               <button
-                onClick={toggleSidebar} // Pastikan nama fungsi ini sesuai dengan state Anda
+                onClick={toggleSidebar}
                 className="md:hidden p-2 -ml-2 mr-1 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors"
               >
                 <Menu className="h-5 w-5" />
@@ -655,7 +750,31 @@ export default function ChatPage() {
             ) : (
               <div className="space-y-6">
                 {messages.map((msg, idx) => (
-                  <ChatMessage key={idx} {...msg} />
+                  <ChatMessage
+                    key={idx}
+                    role={msg.role}
+                    content={msg.content}
+                    references={msg.references}
+                    isStreaming={msg.isStreaming}
+                    reasoning={msg.reasoning}
+                    queryType={msg.queryType}
+                    onRegenerate={
+                      idx === messages.length - 1 && msg.role === "assistant"
+                        ? handleRegenerate
+                        : undefined
+                    }
+                    onFeedback={
+                      msg.role === "assistant" && (msg as any).id
+                        ? (type, reason) =>
+                            handleFeedback((msg as any).id, type, reason)
+                        : undefined
+                    }
+                    onShare={
+                      msg.role === "assistant"
+                        ? () => handleShare(msg.content)
+                        : undefined
+                    }
+                  />
                 ))}
 
                 {/* Routing Indicator */}

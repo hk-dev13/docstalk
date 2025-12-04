@@ -20,6 +20,17 @@ const sourceIcons: Record<
   react: { icon: "⚛️", label: "React", color: "text-blue-500" },
   typescript: { icon: "🔷", label: "TypeScript", color: "text-blue-600" },
   meta: { icon: "🏢", label: "DocsTalk Platform", color: "text-purple-500" },
+
+  // Ecosystems
+  frontend_web: { icon: "🎨", label: "Frontend Web", color: "text-blue-500" },
+  js_backend: { icon: "🟢", label: "JS Backend", color: "text-green-500" },
+  python: { icon: "🐍", label: "Python Ecosystem", color: "text-yellow-500" },
+  systems: { icon: "⚙️", label: "Systems Programming", color: "text-red-500" },
+  cloud_infra: { icon: "☁️", label: "Cloud & Infra", color: "text-purple-500" },
+  ai_ml: { icon: "🤖", label: "AI & ML", color: "text-pink-500" },
+  database: { icon: "🗄️", label: "Database", color: "text-cyan-500" },
+  styling: { icon: "💅", label: "Styling", color: "text-teal-500" },
+  general: { icon: "🧠", label: "General Knowledge", color: "text-gray-500" },
 };
 
 export function RoutingIndicator({

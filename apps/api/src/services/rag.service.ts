@@ -195,14 +195,40 @@ export class RAGService {
     content: string,
     references?: Array<{ title: string; url: string; snippet: string }>,
     tokensUsed?: number
+  ): Promise<string> {
+    const { data, error } = await this.supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        role,
+        content,
+        references: references || null,
+        tokens_used: tokensUsed || 0,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  }
+
+  /**
+   * Save chat feedback
+   */
+  async saveFeedback(
+    messageId: string,
+    userId: string,
+    feedbackType: "up" | "down",
+    reason?: string
   ): Promise<void> {
-    await this.supabase.from("messages").insert({
-      conversation_id: conversationId,
-      role,
-      content,
-      references: references || null,
-      tokens_used: tokensUsed || 0,
+    const { error } = await this.supabase.from("chat_feedback").insert({
+      message_id: messageId,
+      user_id: userId,
+      feedback_type: feedbackType,
+      reason,
     });
+
+    if (error) throw error;
   }
 
   /**
@@ -446,7 +472,7 @@ Always reply in user language even if not configured.`,
    */
   async searchDocumentation(
     query: string,
-    source?: string,
+    source?: string | string[],
     limit: number = 5
   ): Promise<SearchResult[]> {
     // Generate query embedding
@@ -654,10 +680,14 @@ Give your answer now based on the instructions above.
    */
   async *generateAnswerStream(
     query: string,
-    source?: string,
+    source?: string | string[],
     conversationHistory?: Array<{ role: string; content: string }>,
     responseMode: string = "friendly"
-  ): AsyncGenerator<string, void, unknown> {
+  ): AsyncGenerator<
+    { type: "content"; text: string } | { type: "references"; data: any[] },
+    void,
+    unknown
+  > {
     // 1. Reformulate query
     const searchQuery = await this.reformulateQuery(query, conversationHistory);
 
@@ -667,6 +697,14 @@ Give your answer now based on the instructions above.
       source,
       5
     );
+
+    // Yield references immediately
+    const references = searchResults.slice(0, 5).map((result) => ({
+      title: result.title,
+      url: result.url,
+      snippet: result.content.substring(0, 150) + "...",
+    }));
+    yield { type: "references", data: references };
 
     // 3. Build context
     const context = searchResults
@@ -691,12 +729,20 @@ Content: ${result.content}
     const { persona, style } = this.getResponseModePersona(responseMode);
 
     // 6. BUILD THE GLOBAL-READY PROMPT (SAMA PERSIS DENGAN NON-STREAM AGAR KONSISTEN)
+    const targetSources = Array.isArray(source)
+      ? source.join(", ")
+      : source
+      ? source
+      : "General Knowledge";
+
     const prompt = `
 ${persona}
 
 ${historyContext}
 
 **User Question:** "${query}"
+
+**Target Documentation Sources:** ${targetSources}
 
 **Available Documentation Context:**
 ${context || "No specific documentation found for this query."}
@@ -737,7 +783,7 @@ Give your answer now.
       let text = chunk.text;
       if (!text) continue;
 
-      yield text;
+      yield { type: "content", text };
     }
   }
 

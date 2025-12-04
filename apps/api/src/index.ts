@@ -239,13 +239,15 @@ fastify.post<{
       });
 
       // Stream response
-      for await (const chunk of ragService.generateAnswerStream(
+      for await (const part of ragService.generateAnswerStream(
         query,
         docSource,
         conversationHistory,
         responseMode
       )) {
-        reply.raw.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        if (part.type === "content") {
+          reply.raw.write(`data: ${JSON.stringify({ chunk: part.text })}\n\n`);
+        }
       }
 
       // Increment usage after successful stream start
@@ -440,11 +442,47 @@ fastify.post<{
         return reply.code(400).send({ error: "role and content are required" });
       }
 
-      await ragService.saveMessage(id, role, content, references, tokensUsed);
-      return { success: true };
+      const messageId = await ragService.saveMessage(
+        id,
+        role,
+        content,
+        references,
+        tokensUsed
+      );
+      return { success: true, messageId };
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: "Failed to save message" });
+    }
+  }
+);
+
+// Submit feedback
+fastify.post<{
+  Body: {
+    messageId: string;
+    feedbackType: "up" | "down";
+    reason?: string;
+  };
+}>(
+  "/api/v1/feedback",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { messageId, feedbackType, reason } = request.body;
+      const userId = request.auth!.userId;
+
+      if (!messageId || !feedbackType) {
+        return reply
+          .code(400)
+          .send({ error: "messageId and feedbackType are required" });
+      }
+
+      await ragService.saveFeedback(messageId, userId, feedbackType, reason);
+      return { success: true };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: "Failed to submit feedback" });
     }
   }
 );

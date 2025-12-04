@@ -50,6 +50,10 @@ export interface SessionContext {
 export type AutoDetectEvent =
   | { event: "routing"; data: RoutingMetadata }
   | { event: "content"; data: { chunk: string } }
+  | {
+      event: "references";
+      data: Array<{ title: string; url: string; snippet: string }>;
+    }
   | { event: "clarification"; data: ClarificationResponse }
   | { event: "done"; data: {} };
 
@@ -433,6 +437,31 @@ export async function saveMessage(
       body: JSON.stringify({ role, content, references, tokensUsed }),
     }
   );
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Submit chat feedback
+ */
+export async function submitFeedback(
+  messageId: string,
+  feedbackType: "up" | "down",
+  token: string,
+  reason?: string
+) {
+  const response = await fetch(`${API_URL}/api/backend/feedback`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ messageId, feedbackType, reason }),
+  });
 
   if (!response.ok) {
     throw new Error(`API error: ${response.statusText}`);
