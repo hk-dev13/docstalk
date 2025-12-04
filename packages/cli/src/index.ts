@@ -147,7 +147,7 @@ program
 
       // Prepare request body
       const body = {
-        message: query,
+        query: query, // API expects 'query' not 'message'
         stream: true,
         ...(options.source && { forceDocSource: options.source }),
       };
