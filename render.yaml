@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: docstalk-api
+    env: node
+    plan: free
+    region: singapore # Change to your preferred region
+    buildCommand: pnpm install && pnpm --filter @docstalk/api build
+    startCommand: pnpm --filter @docstalk/api start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.0
+      - key: PNPM_VERSION
+        value: 10.23.0
+      # Add these secrets manually in the Render Dashboard:
+      # - DOCSTALK_API_TOKEN
+      # - CLERK_SECRET_KEY
+      # - CLERK_PUBLISHABLE_KEY
+      # - SUPABASE_URL
+      # - SUPABASE_KEY
+      # - GOOGLE_GENAI_API_KEY
+      # - QDRANT_URL
+      # - QDRANT_API_KEY
