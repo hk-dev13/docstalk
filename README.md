@@ -52,7 +52,7 @@ DocsTalk now uses a **Hybrid Architecture** for maximum scalability and performa
 - **RAG Powered**: Uses Google Gemini 2.5 Flash for accurate, context-aware answers
 - **Global Language Support**: Responds in user's query language (100+ languages)
 
-## 🎯 Ecosystem-Based Routing (v0.3.0-alpha)
+## 🎯 Ecosystem-Based Routing (v0.3.1-alpha)
 
 DocsTalk now uses **Hierarchical Ecosystem Routing** for intelligent documentation detection:
 

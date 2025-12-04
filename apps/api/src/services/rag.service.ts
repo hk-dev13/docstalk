@@ -263,15 +263,10 @@ export class RAGService {
   private async generateEmbedding(text: string): Promise<number[]> {
     const result = await this.client.models.embedContent({
       model: "text-embedding-004",
-      contents: text,
+      contents: [text], // API requires array of strings, not single string
     });
-    // The new SDK returns embedding.values directly or inside embedding object depending on version?
-    // Checking docs: result.embedding.values is correct for new SDK too?
-    // Wait, new SDK docs say:
-    // const response = await ai.models.embedContent({ model: 'text-embedding-004', contents: '...' });
-    // console.log(response.embedding.values);
-    // Let's assume it's similar but check if values is present.
-    // Actually new SDK returns `EmbedContentResponse` which has `embedding` which has `values`.
+
+    // New SDK returns result.embeddings[0].values
     if (!result.embeddings?.[0]?.values) {
       throw new Error("Failed to generate embedding");
     }
