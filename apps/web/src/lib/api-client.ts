@@ -60,6 +60,7 @@ export async function* streamChatAuto(
   query: string,
   userId: string,
   userEmail: string,
+  token: string,
   conversationId?: string,
   conversationHistory?: Array<{ role: string; content: string }>,
   responseMode?: string,
@@ -68,7 +69,10 @@ export async function* streamChatAuto(
   try {
     const response = await fetch(`${API_URL}/api/backend/chat/auto/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         query,
         userId,
@@ -130,11 +134,17 @@ export async function* streamChatAuto(
  * Get session context for a conversation
  */
 export async function getSessionContext(
-  conversationId: string
+  conversationId: string,
+  token: string
 ): Promise<SessionContext | null> {
   try {
     const response = await fetch(
-      `${API_URL}/api/backend/conversations/${conversationId}/session`
+      `${API_URL}/api/backend/conversations/${conversationId}/session`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
 
     if (!response.ok) {
@@ -155,6 +165,7 @@ export async function getSessionContext(
 export async function* streamChat(
   query: string,
   docSource: string,
+  token: string,
   userId?: string,
   userEmail?: string,
   conversationHistory?: Array<{ role: string; content: string }>,
@@ -164,7 +175,10 @@ export async function* streamChat(
     // Use /api/backend prefix which is rewritten in next.config.ts
     const response = await fetch(`${API_URL}/api/backend/chat/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({
         query,
         docSource,
@@ -235,12 +249,16 @@ export async function* streamChat(
 export async function getChatResponse(
   query: string,
   docSource: string,
+  token: string,
   userId?: string,
   userEmail?: string
 ) {
   const response = await fetch(`${API_URL}/api/backend/chat/query`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ query, docSource, userId, userEmail }),
   });
 
@@ -270,9 +288,18 @@ export async function getDocSources() {
 /**
  * Get user usage stats
  */
-export async function getUsageStats(userId: string, userEmail: string) {
+export async function getUsageStats(
+  userId: string,
+  userEmail: string,
+  token: string
+) {
   const response = await fetch(
-    `${API_URL}/api/backend/user/usage?userId=${userId}&userEmail=${userEmail}`
+    `${API_URL}/api/backend/user/usage?userId=${userId}&userEmail=${userEmail}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 
   if (!response.ok) {
@@ -290,12 +317,16 @@ export async function getUsageStats(userId: string, userEmail: string) {
 export async function createConversation(
   userId: string,
   docSource: string,
+  token: string,
   title?: string,
   userEmail?: string
 ) {
   const response = await fetch(`${API_URL}/api/backend/conversations`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ userId, docSource, title, userEmail }),
   });
 
@@ -309,9 +340,18 @@ export async function createConversation(
 /**
  * Get user's conversations
  */
-export async function getUserConversations(userId: string, limit: number = 20) {
+export async function getUserConversations(
+  userId: string,
+  token: string,
+  limit: number = 20
+) {
   const response = await fetch(
-    `${API_URL}/api/backend/conversations?userId=${userId}&limit=${limit}`
+    `${API_URL}/api/backend/conversations?userId=${userId}&limit=${limit}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 
   if (!response.ok) {
@@ -324,9 +364,17 @@ export async function getUserConversations(userId: string, limit: number = 20) {
 /**
  * Get conversation messages
  */
-export async function getConversationMessages(conversationId: string) {
+export async function getConversationMessages(
+  conversationId: string,
+  token: string
+) {
   const response = await fetch(
-    `${API_URL}/api/backend/conversations/${conversationId}/messages`
+    `${API_URL}/api/backend/conversations/${conversationId}/messages`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 
   if (!response.ok) {
@@ -341,13 +389,17 @@ export async function getConversationMessages(conversationId: string) {
  */
 export async function updateConversation(
   conversationId: string,
-  updates: { title?: string; is_pinned?: boolean }
+  updates: { title?: string; is_pinned?: boolean },
+  token: string
 ) {
   const response = await fetch(
     `${API_URL}/api/backend/conversations/${conversationId}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(updates),
     }
   );
@@ -366,6 +418,7 @@ export async function saveMessage(
   conversationId: string,
   role: "user" | "assistant",
   content: string,
+  token: string,
   references?: Array<{ title: string; url: string; snippet: string }>,
   tokensUsed?: number
 ) {
@@ -373,7 +426,10 @@ export async function saveMessage(
     `${API_URL}/api/backend/conversations/${conversationId}/messages`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ role, content, references, tokensUsed }),
     }
   );

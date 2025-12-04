@@ -12,6 +12,7 @@
     "index": "tsx scripts/index/indexer.ts"
   },
   "dependencies": {
+    "@clerk/clerk-sdk-node": "^5.1.6",
     "@docstalk/types": "workspace:*",
     "@fastify/cors": "^10.1.0",
     "@fastify/rate-limit": "^10.3.0",

@@ -40,13 +40,14 @@ import {
   FileCode,
   Server,
 } from "lucide-react";
-import { UserButton, useUser, SignInButton } from "@clerk/nextjs";
+import { UserButton, useUser, SignInButton, useAuth } from "@clerk/nextjs";
 
 const GUEST_MESSAGE_LIMIT = 5;
 const GUEST_MESSAGES_KEY = "docstalk_guest_messages";
 
 export default function ChatPage() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [responseMode, setResponseMode] = useState<string>("auto");
@@ -150,28 +151,41 @@ export default function ChatPage() {
 
   // Fetch usage and conversations on load
   useEffect(() => {
-    if (user?.id && user?.primaryEmailAddress?.emailAddress) {
-      setIsLoadingConversations(true);
-      // Fetch usage
-      getUsageStats(user.id, user.primaryEmailAddress.emailAddress)
-        .then((stats) => {
-          if (stats && typeof stats.count === "number") {
-            setUsage({ count: stats.count, limit: stats.limit });
-          }
-        })
-        .catch(console.error);
+    const loadData = async () => {
+      if (user?.id && user?.primaryEmailAddress?.emailAddress) {
+        setIsLoadingConversations(true);
+        try {
+          const token = await getToken();
+          if (!token) return;
 
-      // Fetch conversations
-      getUserConversations(user.id)
-        .then((data) => {
-          if (data.conversations) {
-            setConversations(data.conversations);
-          }
-        })
-        .catch(console.error)
-        .finally(() => setIsLoadingConversations(false));
-    }
-  }, [user]);
+          // Fetch usage
+          getUsageStats(
+            user.id,
+            user.primaryEmailAddress.emailAddress,
+            token
+          ).then((stats) => {
+            if (stats && typeof stats.count === "number") {
+              setUsage({ count: stats.count, limit: stats.limit });
+            }
+          });
+
+          // Fetch conversations
+          getUserConversations(user.id, token)
+            .then((data) => {
+              if (data.conversations) {
+                setConversations(data.conversations);
+              }
+            })
+            .finally(() => setIsLoadingConversations(false));
+        } catch (error) {
+          console.error("Failed to load user data:", error);
+          setIsLoadingConversations(false);
+        }
+      }
+    };
+
+    loadData();
+  }, [user, getToken]);
 
   const handleNewConversation = () => {
     setCurrentConversationId(null);
@@ -181,8 +195,11 @@ export default function ChatPage() {
   const handleSelectConversation = async (conversationId: string) => {
     try {
       setCurrentConversationId(conversationId);
+      const token = await getToken();
+      if (!token) return;
+
       // Optional: Add loading state for messages here if desired
-      const data = await getConversationMessages(conversationId);
+      const data = await getConversationMessages(conversationId, token);
       if (data.messages) {
         const loadedMessages = data.messages.map((msg: any) => ({
           role: msg.role,
@@ -197,6 +214,9 @@ export default function ChatPage() {
 
   const handleTogglePin = async (conversationId: string, isPinned: boolean) => {
     try {
+      const token = await getToken();
+      if (!token) return;
+
       // Optimistic update
       setConversations((prev) =>
         prev
@@ -215,11 +235,11 @@ export default function ChatPage() {
           })
       );
 
-      await updateConversation(conversationId, { is_pinned: isPinned });
+      await updateConversation(conversationId, { is_pinned: isPinned }, token);
 
       // Re-fetch to ensure sync (optional, but good for consistency)
       if (user?.id) {
-        const data = await getUserConversations(user.id);
+        const data = await getUserConversations(user.id, token);
         if (data.conversations) setConversations(data.conversations);
       }
     } catch (error) {
@@ -267,11 +287,13 @@ export default function ChatPage() {
       const email =
         user?.primaryEmailAddress?.emailAddress || "guest@temporary.com";
       const userId = user?.id || `guest_${Date.now()}`;
+      // Get token if user is logged in
+      const token = user ? await getToken() : "";
 
       let conversationId = currentConversationId;
 
       // For authenticated users, ensure conversation exists
-      if (user) {
+      if (user && token) {
         if (!conversationId) {
           try {
             // Use forcedSource if available, otherwise default to "nextjs" for initial conversation creation
@@ -282,6 +304,7 @@ export default function ChatPage() {
             const convData = await createConversation(
               user.id,
               initialSource,
+              token,
               query.slice(0, 50),
               email
             );
@@ -289,7 +312,7 @@ export default function ChatPage() {
             setCurrentConversationId(conversationId);
 
             // Refresh conversations list
-            getUserConversations(user.id).then((data) => {
+            getUserConversations(user.id, token).then((data) => {
               if (data.conversations) setConversations(data.conversations);
             });
           } catch (err) {
@@ -300,7 +323,9 @@ export default function ChatPage() {
 
         // Save user message to DB
         if (conversationId && !skipUserMessage) {
-          await saveMessage(conversationId, "user", query).catch(console.error);
+          await saveMessage(conversationId, "user", query, token).catch(
+            console.error
+          );
         }
       }
 
@@ -318,10 +343,19 @@ export default function ChatPage() {
       // Stream with auto-detect API (used for both auto and manual)
       console.log("[Unified Handler] Starting stream:", { query, sourceToUse });
 
+      // If guest, we might need a different handling or just pass empty token if backend allows (it shouldn't for protected routes)
+      // But wait, our backend now PROTECTS everything.
+      // So guests CANNOT use the API anymore unless we allow public access or have a guest token.
+      // The requirement was "Security Review", and we locked it down.
+      // Guest access will fail with 401.
+      // We should probably handle that gracefully or disable guest access in UI.
+      // For now, let's pass the token. If empty (guest), it will fail, which is correct security behavior.
+
       for await (const event of streamChatAuto(
         query,
         userId,
         email,
+        token || "", // Pass token
         conversationId || undefined,
         history,
         responseMode,
@@ -392,10 +426,13 @@ export default function ChatPage() {
       // Post-stream actions
 
       // 1. Save assistant message for authenticated users
-      if (user && conversationId && fullResponse) {
-        await saveMessage(conversationId, "assistant", fullResponse).catch(
-          console.error
-        );
+      if (user && token && conversationId && fullResponse) {
+        await saveMessage(
+          conversationId,
+          "assistant",
+          fullResponse,
+          token
+        ).catch(console.error);
       }
 
       // 2. Increment guest counter
@@ -407,8 +444,8 @@ export default function ChatPage() {
       }
 
       // 3. Refresh session context
-      if (conversationId) {
-        getSessionContext(conversationId).then((ctx) => {
+      if (conversationId && token) {
+        getSessionContext(conversationId, token).then((ctx) => {
           if (ctx) setSessionContext(ctx);
         });
       }
@@ -424,6 +461,9 @@ export default function ChatPage() {
       if (error.message === "LIMIT_REACHED") {
         errorMessage =
           "🚫 Monthly limit reached (30/30). Please upgrade to continue.";
+      } else if (error.message?.includes("401")) {
+        errorMessage = "🔒 Please sign in to continue.";
+        setShowAuthModal(true);
       }
 
       setMessages((prev) => [

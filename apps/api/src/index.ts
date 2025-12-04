@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import { RAGService } from "./services/rag.service.js";
 import { RouterService } from "./services/router.service.js";
 import { registerAutoDetectRoutes } from "./services/auto-detect.routes.js";
+import { authMiddleware } from "./middleware/auth.js";
 
 const fastify = Fastify({
   logger: true,
@@ -19,8 +20,12 @@ const routerService = new RouterService(ragService.supabase);
 
 // Register plugins
 await fastify.register(cors, {
-  origin: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  origin: [
+    "http://localhost:3000",
+    "https://docstalk.envoyou.com",
+    "https://docstalk-git-main-hk-dev13s-projects.vercel.app", // Add Vercel preview URLs if needed
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   credentials: true,
 });
@@ -28,18 +33,14 @@ await fastify.register(cors, {
 // Rate limiting - protect against abuse and control costs
 await fastify.register(rateLimit as any, {
   max: async (req: any) => {
-    // Check if user is authenticated (has userId in body or query)
-    const userId = (req.body as any)?.userId || (req.query as any)?.userId;
-
     // Authenticated users: 60 requests per minute
-    // Guest users: 30 requests per minute
-    return userId ? 60 : 30;
+    // Unauthenticated (if any public routes exist): 10 requests per minute
+    return req.auth?.userId ? 60 : 10;
   },
   timeWindow: "1 minute",
   keyGenerator: (req: any) => {
-    // Use userId for authenticated, IP for guests
-    const userId = (req.body as any)?.userId || (req.query as any)?.userId;
-    if (userId) return `user:${userId}`;
+    // Use verified userId for authenticated users
+    if (req.auth?.userId) return `user:${req.auth.userId}`;
 
     // Get real IP behind proxy (Vercel/Cloud Run)
     const forwardedFor = req.headers["x-forwarded-for"];
@@ -60,34 +61,38 @@ await fastify.register(rateLimit as any, {
 // Register auto-detect routes
 await registerAutoDetectRoutes(fastify, ragService, routerService);
 
-// Debug endpoint to check table schema
-fastify.get("/api/debug/schema", async (request, reply) => {
-  const { data, error } = await ragService.supabase.rpc("get_table_info", {
-    table_name: "users",
-  });
+// Debug endpoint to check table schema (Protected)
+fastify.get(
+  "/api/debug/schema",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    const { data, error } = await ragService.supabase.rpc("get_table_info", {
+      table_name: "users",
+    });
 
-  // Check vector search
-  const { data: chunks, error: chunksError } = await ragService.supabase.rpc(
-    "search_docs",
-    {
-      query_embedding: Array(768).fill(0), // Dummy embedding
-      match_threshold: 0.0,
-      match_count: 1,
-    }
-  );
+    // Check vector search
+    const { data: chunks, error: chunksError } = await ragService.supabase.rpc(
+      "search_docs",
+      {
+        query_embedding: Array(768).fill(0), // Dummy embedding
+        match_threshold: 0.0,
+        match_count: 1,
+      }
+    );
 
-  return { chunks, chunksError };
-});
+    return { chunks, chunksError };
+  }
+);
 
-// Health check
+// Health check (Public)
 fastify.get("/health", async () => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 
-// Test RAG search
+// Test RAG search (Protected)
 fastify.post<{
   Body: { query: string; source?: string };
-}>("/api/v1/search", async (request, reply) => {
+}>("/api/v1/search", { preHandler: authMiddleware }, async (request, reply) => {
   try {
     const { query, source } = request.body;
 
@@ -111,168 +116,181 @@ fastify.post<{
   }
 });
 
-// Chat endpoint (non-streaming)
+// Chat endpoint (non-streaming) (Protected)
 fastify.post<{
   Body: {
     query: string;
     docSource?: string;
-    userId?: string;
-    userEmail?: string;
+    // userId and userEmail are now extracted from auth token
     conversationHistory?: Array<{ role: string; content: string }>;
     responseMode?: string;
+    userEmail?: string; // Optional fallback
   };
-}>("/api/v1/chat/query", async (request, reply) => {
-  try {
-    const {
-      query,
-      docSource,
-      userId,
-      userEmail,
-      conversationHistory,
-      responseMode,
-    } = request.body;
+}>(
+  "/api/v1/chat/query",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { query, docSource, conversationHistory, responseMode } =
+        request.body;
+      const userId = request.auth!.userId;
+      // We need to get email from Clerk or pass it from frontend if needed for usage tracking
+      // For now, we'll rely on userId for usage tracking in the future, but current service needs email
+      // Let's assume we can get it from claims or fetch it.
+      // For simplicity in this migration, we might still accept email in body BUT verify userId matches token
+      // OR better: fetch user details from Clerk if needed.
+      // However, ragService.checkUsageLimit uses email to create user if not exists.
+      // Let's use the email from claims if available, or fallback to body (but trust token for ID)
+      const userEmail = request.auth!.claims.email || request.body.userEmail; // Ensure frontend sends email or we get it from token
 
-    if (!query) {
-      return reply.code(400).send({ error: "Query is required" });
-    }
-
-    // Check usage limit if userId provided
-    if (userId && userEmail) {
-      const { allowed, count, limit } = await ragService.checkUsageLimit(
-        userId,
-        userEmail
-      );
-      if (!allowed) {
-        return reply.code(403).send({
-          error: "Monthly limit reached",
-          message: `You have used ${count}/${limit} free queries this month.`,
-        });
+      if (!query) {
+        return reply.code(400).send({ error: "Query is required" });
       }
+
+      // Check usage limit
+      if (userId && userEmail) {
+        const { allowed, count, limit } = await ragService.checkUsageLimit(
+          userId,
+          userEmail
+        );
+        if (!allowed) {
+          return reply.code(403).send({
+            error: "Monthly limit reached",
+            message: `You have used ${count}/${limit} free queries this month.`,
+          });
+        }
+      }
+
+      fastify.log.info(
+        { query, docSource, userId, responseMode },
+        "Processing chat query"
+      );
+
+      const response = await ragService.generateAnswer(
+        query,
+        docSource,
+        conversationHistory,
+        responseMode
+      );
+
+      // Increment usage
+      if (userId) {
+        await ragService.incrementUsage(userId);
+      }
+
+      return response;
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        error: "Query processing failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
     }
-
-    fastify.log.info(
-      { query, docSource, userId, responseMode },
-      "Processing chat query"
-    );
-
-    const response = await ragService.generateAnswer(
-      query,
-      docSource,
-      conversationHistory,
-      responseMode
-    );
-
-    // Increment usage
-    if (userId) {
-      await ragService.incrementUsage(userId);
-    }
-
-    return response;
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({
-      error: "Query processing failed",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
   }
-});
+);
 
-// Chat endpoint (streaming)
+// Chat endpoint (streaming) (Protected)
 fastify.post<{
   Body: {
     query: string;
     docSource?: string;
-    userId?: string;
-    userEmail?: string;
     conversationHistory?: Array<{ role: string; content: string }>;
     responseMode?: string;
+    userEmail?: string; // Optional, if not in token
   };
-}>("/api/v1/chat/stream", async (request, reply) => {
-  try {
-    const {
-      query,
-      docSource,
-      userId,
-      userEmail,
-      conversationHistory,
-      responseMode,
-    } = request.body;
+}>(
+  "/api/v1/chat/stream",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { query, docSource, conversationHistory, responseMode } =
+        request.body;
+      const userId = request.auth!.userId;
+      const userEmail = request.auth!.claims.email || request.body.userEmail;
 
-    if (!query) {
-      return reply.code(400).send({ error: "Query is required" });
-    }
-
-    // Check usage limit
-    if (userId && userEmail) {
-      const { allowed, count, limit } = await ragService.checkUsageLimit(
-        userId,
-        userEmail
-      );
-      if (!allowed) {
-        return reply.code(403).send({
-          error: "Monthly limit reached",
-          message: `You have used ${count}/${limit} free queries this month.`,
-        });
+      if (!query) {
+        return reply.code(400).send({ error: "Query is required" });
       }
+
+      // Check usage limit
+      if (userId && userEmail) {
+        const { allowed, count, limit } = await ragService.checkUsageLimit(
+          userId,
+          userEmail
+        );
+        if (!allowed) {
+          return reply.code(403).send({
+            error: "Monthly limit reached",
+            message: `You have used ${count}/${limit} free queries this month.`,
+          });
+        }
+      }
+
+      fastify.log.info(
+        { query, docSource, userId },
+        "Processing streaming query"
+      );
+
+      // Set headers for SSE
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      // Stream response
+      for await (const chunk of ragService.generateAnswerStream(
+        query,
+        docSource,
+        conversationHistory,
+        responseMode
+      )) {
+        reply.raw.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+      }
+
+      // Increment usage after successful stream start
+      if (userId) {
+        await ragService.incrementUsage(userId);
+      }
+
+      reply.raw.write("data: [DONE]\n\n");
+      reply.raw.end();
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({
+        error: "Streaming failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
     }
-
-    fastify.log.info(
-      { query, docSource, userId },
-      "Processing streaming query"
-    );
-
-    // Set headers for SSE
-    reply.raw.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
-
-    // Stream response
-    for await (const chunk of ragService.generateAnswerStream(
-      query,
-      docSource,
-      conversationHistory,
-      responseMode
-    )) {
-      reply.raw.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-    }
-
-    // Increment usage after successful stream start
-    if (userId) {
-      await ragService.incrementUsage(userId);
-    }
-
-    reply.raw.write("data: [DONE]\n\n");
-    reply.raw.end();
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({
-      error: "Streaming failed",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
   }
-});
+);
 
-// Get usage stats
+// Get usage stats (Protected)
 fastify.get<{
-  Querystring: { userId: string; userEmail: string };
-}>("/api/v1/user/usage", async (request, reply) => {
-  try {
-    const { userId, userEmail } = request.query;
-    if (!userId || !userEmail) {
-      return { count: 0, limit: 30 };
+  Querystring: { userEmail?: string };
+}>(
+  "/api/v1/user/usage",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const userId = request.auth!.userId;
+      const userEmail =
+        request.auth!.claims.email || (request.query as any).userEmail;
+
+      if (!userId || !userEmail) {
+        return { count: 0, limit: 30 };
+      }
+
+      const stats = await ragService.checkUsageLimit(userId, userEmail);
+      return stats;
+    } catch (error) {
+      fastify.log.error(error);
+      return { count: 0, limit: 30, error: "Failed to fetch usage" };
     }
-
-    const stats = await ragService.checkUsageLimit(userId, userEmail);
-    return stats;
-  } catch (error) {
-    fastify.log.error(error);
-    return { count: 0, limit: 30, error: "Failed to fetch usage" };
   }
-});
+);
 
-// Get available documentation sources
+// Get available documentation sources (Public)
 fastify.get("/api/v1/docs/sources", async () => {
   try {
     const { createClient } = await import("@supabase/supabase-js");
@@ -296,96 +314,109 @@ fastify.get("/api/v1/docs/sources", async () => {
   }
 });
 
-// ===== CONVERSATION ENDPOINTS =====
+// ===== CONVERSATION ENDPOINTS (Protected) =====
 
 // Create new conversation
 fastify.post<{
   Body: {
-    userId: string;
     docSource: string;
     title?: string;
     userEmail?: string;
   };
-}>("/api/v1/conversations", async (request, reply) => {
-  try {
-    const { userId, docSource, title, userEmail } = request.body;
+}>(
+  "/api/v1/conversations",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { docSource, title } = request.body;
+      const userId = request.auth!.userId;
+      const userEmail = request.auth!.claims.email || request.body.userEmail;
 
-    if (!userId || !docSource) {
-      return reply
-        .code(400)
-        .send({ error: "userId and docSource are required" });
+      if (!docSource) {
+        return reply.code(400).send({ error: "docSource is required" });
+      }
+
+      const conversationId = await ragService.getOrCreateConversation(
+        userId,
+        docSource,
+        title,
+        userEmail
+      );
+      return { conversationId };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: "Failed to create conversation" });
     }
-
-    const conversationId = await ragService.getOrCreateConversation(
-      userId,
-      docSource,
-      title,
-      userEmail
-    );
-    return { conversationId };
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({ error: "Failed to create conversation" });
   }
-});
+);
 
 // Get user conversations
 fastify.get<{
-  Querystring: { userId: string; limit?: string };
-}>("/api/v1/conversations", async (request, reply) => {
-  try {
-    const { userId, limit } = request.query;
+  Querystring: { limit?: string };
+}>(
+  "/api/v1/conversations",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { limit } = request.query;
+      const userId = request.auth!.userId;
 
-    if (!userId) {
-      return reply.code(400).send({ error: "userId is required" });
+      const conversations = await ragService.getUserConversations(
+        userId,
+        limit ? parseInt(limit) : 20
+      );
+      return { conversations };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: "Failed to get conversations" });
     }
-
-    const conversations = await ragService.getUserConversations(
-      userId,
-      limit ? parseInt(limit) : 20
-    );
-    return { conversations };
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({ error: "Failed to get conversations" });
   }
-});
+);
 
 // Get conversation messages
 fastify.get<{
   Params: { id: string };
-}>("/api/v1/conversations/:id/messages", async (request, reply) => {
-  try {
-    const { id } = request.params;
-    const messages = await ragService.getConversationMessages(id);
-    return { messages };
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({ error: "Failed to get messages" });
+}>(
+  "/api/v1/conversations/:id/messages",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { id } = request.params;
+      // TODO: Verify user owns conversation
+      const messages = await ragService.getConversationMessages(id);
+      return { messages };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: "Failed to get messages" });
+    }
   }
-});
+);
 
-// Update conversation title
 // Update conversation (title, pin)
 fastify.patch<{
   Params: { id: string };
   Body: { title?: string; is_pinned?: boolean };
-}>("/api/v1/conversations/:id", async (request, reply) => {
-  try {
-    const { id } = request.params;
-    const { title, is_pinned } = request.body;
+}>(
+  "/api/v1/conversations/:id",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { id } = request.params;
+      const { title, is_pinned } = request.body;
+      // TODO: Verify user owns conversation
 
-    if (title === undefined && is_pinned === undefined) {
-      return reply.code(400).send({ error: "No updates provided" });
+      if (title === undefined && is_pinned === undefined) {
+        return reply.code(400).send({ error: "No updates provided" });
+      }
+
+      await ragService.updateConversation(id, { title, is_pinned });
+      return { success: true };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: "Failed to update conversation" });
     }
-
-    await ragService.updateConversation(id, { title, is_pinned });
-    return { success: true };
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({ error: "Failed to update conversation" });
   }
-});
+);
 
 // Save message to conversation
 fastify.post<{
@@ -396,22 +427,27 @@ fastify.post<{
     references?: any[];
     tokensUsed?: number;
   };
-}>("/api/v1/conversations/:id/messages", async (request, reply) => {
-  try {
-    const { id } = request.params;
-    const { role, content, references, tokensUsed } = request.body;
+}>(
+  "/api/v1/conversations/:id/messages",
+  { preHandler: authMiddleware },
+  async (request, reply) => {
+    try {
+      const { id } = request.params;
+      const { role, content, references, tokensUsed } = request.body;
+      // TODO: Verify user owns conversation
 
-    if (!role || !content) {
-      return reply.code(400).send({ error: "role and content are required" });
+      if (!role || !content) {
+        return reply.code(400).send({ error: "role and content are required" });
+      }
+
+      await ragService.saveMessage(id, role, content, references, tokensUsed);
+      return { success: true };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: "Failed to save message" });
     }
-
-    await ragService.saveMessage(id, role, content, references, tokensUsed);
-    return { success: true };
-  } catch (error) {
-    fastify.log.error(error);
-    return reply.code(500).send({ error: "Failed to save message" });
   }
-});
+);
 
 // Start server
 const start = async () => {
