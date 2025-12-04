@@ -1,4 +1,4 @@
--- WARNING: This schema is for context only and already exists in the database and is not meant to be run again.
+-- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
 CREATE TABLE public.context_switches (

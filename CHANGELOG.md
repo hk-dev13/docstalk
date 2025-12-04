@@ -79,6 +79,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-environment support (dev/staging/production)
 - CI/CD integration ready
 
+### 🐛 Bug Fixes (2025-12-04)
+
+- **UUID Format Compatibility** (Qdrant)
+  - Fixed: Qdrant requires UUID or unsigned integer for point IDs
+  - Changed from SHA-1 hex (40 chars) to proper UUID v5 format
+  - Format: `xxxxxxxx-xxxx-5xxx-yxxx-xxxxxxxxxxxx`
+  - Result: Stable deterministic IDs that Qdrant accepts
+- **Google Gemini SDK v1.30.0 Compatibility**
+  - Fixed: `embedContent` API breaking changes
+  - Changed: `contents` parameter format
+  - Result: Embedding generation works with latest SDK
+- **CLI Query Field Mismatch**
+  - Fixed: CLI sent `message` but API expected `query`
+  - Changed: Request body field name
+  - Result: CLI `ask` command works properly
+- **TypeScript Type Compatibility**
+  - Fixed: Parameter name to match SDK types
+  - Result: No lint errors, proper type safety
+
+### ✅ Verification
+
+- All 14 documentation sources indexed successfully
+- 100% ecosystem coverage tested
+- Multi-language support verified (Indonesian/English)
+- CLI commands working as expected
+- No errors in production deployment
+
 ---
 
 ## [0.3.0-alpha] - 2025-12-01
