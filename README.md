@@ -24,6 +24,7 @@ Stop trusting stale answers.**
 
 [![DocsTalk](https://img.shields.io/badge/DocsTalk-Smart_Assistant-000000?style=flat)](https://docstalk.envoyou.com)
 [![MIT License](https://img.shields.io/badge/License-MIT-000000?style=flat)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/Version-0.3.1--alpha-blue)](https://github.com/hk-dev13/docstalk/releases)
 
 <br />
 
@@ -32,54 +33,106 @@ Get instant, accurate answers from official docs using RAG.**
 
 </div>
 
-## 🏗️ Hybrid Architecture
+---
 
-DocsTalk now uses a **Hybrid Architecture** for maximum scalability and performance:
+## 📑 Table of Contents
 
-- **Supabase (PostgreSQL)**: Acts as the **System of Record**. Stores user data, chat history, and documentation metadata (ID, URL, Title).
-- **Qdrant (Vector DB)**: Acts as the **Semantic Engine**. Stores high-dimensional vectors and full content payloads for lightning-fast retrieval.
+- [Overview](#-overview)
+- [When to Use DocsTalk](#-when-to-use-docstalk)
+- [Key Features](#-key-features)
+- [Architecture](#️-hybrid-architecture)
+- [Ecosystem Routing](#-ecosystem-based-routing-v031-alpha)
+- [Getting Started](#-getting-started)
+- [CLI Usage](#-cli-usage)
+- [Known Limitations](#-known-limitations)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## 🎯 Overview
+
+DocsTalk is an AI-powered documentation assistant that helps developers find accurate answers from official documentation. Unlike general-purpose LLMs that may hallucinate or provide outdated information, DocsTalk uses RAG (Retrieval-Augmented Generation) to ensure answers are grounded in actual, up-to-date documentation.
+
+**Current Status:** v0.3.1-alpha (Production-Ready)
+
+---
+
+## ✅ When to Use DocsTalk
+
+### 👍 Use this if:
+
+- You want accurate answers from official documentation
+- You're tired of LLMs making up APIs or deprecated features
+- You work with multiple frameworks and need quick reference
+- You need answers in your native language (supports 100+ languages)
+- You want to ensure consistency across team documentation lookup
+
+### 👎 Not suitable if:
+
+- You need general-purpose chat AI or creative writing
+- You want code generation without documentation context
+- You need offline access (requires internet connection)
+- You're looking for non-technical content
+
+---
 
 ## ✨ Key Features
 
-- **Ecosystem-Based Routing** ⭐ NEW: Hierarchical doc grouping with 10-250x faster detection
-- **Smart Scraping** 🆕: Incremental & partial modes for 5-60x faster updates
-- **Secure CLI** 🔒 NEW: Multi-layer authentication for developer commands
-- **Smart Auto-Detection**: Automatically identifies which documentation you're asking about
+- **Ecosystem-Based Routing** ⭐: Hierarchical doc grouping with intelligent detection*
+- **Smart Scraping** 🆕: Incremental & partial modes (5-60x faster updates)*
+- **Secure CLI** 🔒: Multi-layer authentication for developer commands
+- **Smart Auto-Detection**: Automatically identifies relevant documentation
 - **Hybrid Search**: Combines keyword matching with semantic vector search
-- **Multi-Source Support**: Node.js, React, Next.js, TypeScript, Tailwind, Python, Go, Rust, Docker, FastAPI, Vue, PostgreSQL
+- **Multi-Source Support**: 16 sources across 8 ecosystems (React, Next.js, Python, Docker, etc.)
 - **Deterministic Indexing**: Stable chunk IDs for idempotent reindexing
-- **CLI Auto-Indexing**: Scrape and index in one go: `docstalk dev scrape <source> --index`
-- **RAG Powered**: Uses Google Gemini 2.5 Flash for accurate, context-aware answers
-- **Global Language Support**: Responds in user's query language (100+ languages)
+- **CLI Tools**: Command-line interface for scraping, indexing, and querying
+- **RAG Powered**: Uses Google Gemini (latest model) for accurate, context-aware answers
+- **Global Language Support**: Responds in user's query language
+
+_*Performance metrics depend on query complexity, dataset size, and baseline comparison. See [Performance](#performance) section._
+
+---
+
+## 🏗️ Hybrid Architecture
+
+DocsTalk uses a **Hybrid Architecture** for maximum scalability and performance:
+
+- **Supabase (PostgreSQL)**: System of Record - stores user data, chat history, and documentation metadata
+- **Qdrant (Vector DB)**: Semantic Engine - stores high-dimensional vectors and full content for fast retrieval
+
+---
 
 ## 🎯 Ecosystem-Based Routing (v0.3.1-alpha)
 
-DocsTalk now uses **Hierarchical Ecosystem Routing** for intelligent documentation detection:
+DocsTalk uses **Hierarchical Ecosystem Routing** for intelligent documentation detection:
 
 ### 8 Ecosystem Groups
 
-- 🟦 **Frontend Web** - React, Next.js, Vue, Svelte, Remix
-- 🟩 **JS Backend** - Node.js, Express, Fastify, Bun
-- 🟧 **Python** - FastAPI, Django, Pandas, NumPy
-- 🟨 **Systems** - Rust, Go, Zig, C/C++
-- 🟥 **Cloud/Infra** - AWS, Docker, Kubernetes
-- 🟪 **AI/ML** - OpenAI, Gemini, RAG, Vector DBs
-- 🟫 **Database** - Prisma, Postgres, MongoDB
-- 🟩 **Styling** - Tailwind, Chakra, Shadcn
+- 🟦 **Frontend Web** - React, Next.js, Vue, TypeScript
+- 🟩 **JS Backend** - Node.js, Express
+- 🟧 **Python** - FastAPI, Python
+- 🟨 **Systems** - Rust, Go
+- 🟥 **Cloud/Infra** - Docker
+- 🟪 **AI/ML** - DocsTalk Platform
+- 🟫 **Database** - Prisma, PostgreSQL
+- 🟩 **Styling** - Tailwind CSS
 
 ### 4-Stage Detection
 
-1. **Alias Matching** (2ms) - Natural phrases like "react hooks", "next router"
-2. **Keyword Groups** (5ms) - Semantic clustering of related concepts
-3. **Vector Similarity** (15ms) - 768d Gemini embeddings
-4. **AI Classification** (500ms) - Fallback for complex queries
+1.  **Alias Matching** (~2ms) - Natural phrases like "react hooks", "next router"
+2.  **Keyword Groups** (~5ms) - Semantic clustering of related concepts
+3.  **Vector Similarity** (~15ms) - 768d Gemini embeddings
+4.  **AI Classification** (~500ms) - Fallback for complex queries
 
 ### Performance
 
-- ⚡ **10-250x faster** detection (2-50ms vs 500ms)
-- 📈 **92% accuracy** (up from 70%)
+- ⚡ **10-250x faster** detection (2-50ms vs 500ms baseline)*
+- 📈 **92% accuracy** in routing queries to correct documentation
 - 🎯 **Multi-doc context** - Searches related docs in parallel
-- 💾 **GIN indexes** - 25-50x faster keyword/alias searches
+- 💾 **GIN indexes** - Optimized keyword/alias searches
+
+_*Compared to full AI classification on every query. Actual speedup varies by query type and complexity._
 
 ## 🚀 Getting Started
 
@@ -124,28 +177,100 @@ cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
 
 # Build all packages
-./scripts/build-all.sh
+pnpm build
 
 # Run development servers
-./scripts/dev-all.sh
+pnpm dev
 ```
 
-### CLI Usage
+---
+
+## 🖥️ CLI Usage
 
 DocsTalk comes with a powerful CLI tool for managing documentation:
 
-```bash
-# Link the CLI globally
-cd apps/cli
-pnpm link --global
+### Installation
 
-# Usage
-docstalk scrape <source>         # Scrape documentation
-docstalk index <source>          # Index documentation
-docstalk scrape <source> --index # Scrape and index in one go
-docstalk ask "question"          # Ask a question from terminal
-docstalk serve                   # Start API server
+```bash
+# Install CLI globally
+npm install -g @docstalk/cli
+
+# Or use from project
+cd packages/cli
+pnpm link --global
 ```
+
+### Public Commands (No authentication required)
+
+```bash
+# Ask a question
+docstalk ask "how to use react hooks?"
+
+# Ask with specific source
+docstalk ask "docker compose" --source docker
+
+# Search documentation
+docstalk search "typescript generics"
+
+# Show version
+docstalk version
+
+# Show help
+docstalk help
+```
+
+### Developer Commands (Requires authentication)
+
+```bash
+# Setup authentication
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_SECRET_KEY
+
+# Start development server
+docstalk dev serve
+
+# Scrape documentation
+docstalk dev scrape react
+docstalk dev scrape react --incremental  # 5-10x faster
+docstalk dev scrape https://react.dev/hooks/useState --partial  # 20-60x faster
+
+# Index documentation
+docstalk dev index react
+
+# Scrape and index in one go
+docstalk dev scrape react --index
+
+# Test router
+docstalk dev test-router "how to use hooks?"
+```
+
+### CLI Features
+
+- **Smart Scraping**: Incremental and partial modes for faster updates
+- **Auto-indexing**: Scrape and index in one command
+- **Multi-layer Auth**: Secure developer commands
+- **Global Access**: Works from anywhere with proper token
+- **Branded UI**: Beautiful ASCII art and helpful messages
+
+See [CLI Documentation](packages/cli/docs/command-structure.md) for more details.
+
+---
+
+## ⚠️ Known Limitations
+
+### Current Limitations (v0.3.1-alpha)
+
+- **No Automatic Re-scraping**: Documentation must be manually re-scraped to update
+- **No Offline Mode**: Requires internet connection for queries and indexing
+- **Partial Source Coverage**: Some documentation sources may have incomplete indexing
+- **API Quota Dependency**: Initial indexing requires Google Gemini API quota
+- **No Real-time Updates**: Documentation updates are not reflected until re-indexed
+- **Limited to 16 Sources**: Currently supports 16 documentation sources (can be expanded)
+
+### Planned Improvements
+
+See [Roadmap](#-roadmap) for upcoming features and improvements.
+
+---
 
 ### Environment Setup
 

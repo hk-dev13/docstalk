@@ -113,6 +113,92 @@ function requireDevPermission(commandName: string) {
 }
 
 // ============================================================================
+// BRANDING & UI
+// ============================================================================
+
+/**
+ * DocsTalk ASCII Art Banner
+ */
+function showBanner() {
+  console.log(
+    chalk.cyan(`
+╔═══════════════════════════════════════════════════════════════╗
+║                                                                ║
+║   ██████╗  ██████╗  ██████╗███████╗████████╗ █████╗ ██╗      ██╗  ██╗
+║   ██╔══██╗██╔═══██╗██╔════╝██╔════╝╚══██╔══╝██╔══██╗██║      ██║ ██╔╝
+║   ██║  ██║██║   ██║██║     ███████╗   ██║   ███████║██║      █████╔╝ 
+║   ██║  ██║██║   ██║██║     ╚════██║   ██║   ██╔══██║██║      ██╔═██╗ 
+║   ██████╔╝╚██████╔╝╚██████╗███████║   ██║   ██║  ██║███████╗ ██║  ██╗
+║   ╚═════╝  ╚═════╝  ╚═════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═╝  ╚═╝
+║                                                                ║
+║   ${chalk.white.bold(
+      "AI-Powered Documentation Assistant"
+    )}                      ║
+║   ${chalk.gray(
+      "Ask questions, get instant answers from official docs"
+    )}         ║
+║                                                                ║
+╚═══════════════════════════════════════════════════════════════╝
+  `)
+  );
+  console.log(
+    chalk.gray(
+      `   Version: ${chalk.green("v0.3.1-alpha")}  |  Mode: ${
+        isDev ? chalk.yellow("Development") : chalk.green("Production")
+      }`
+    )
+  );
+  console.log(
+    chalk.gray(
+      `   Docs: ${chalk.blue("https://github.com/hk-dev13/docstalk")}\n`
+    )
+  );
+}
+
+/**
+ * Show banner for help command
+ */
+function showHelp() {
+  showBanner();
+  console.log(chalk.white.bold("📚 Available Commands:\n"));
+  console.log(chalk.cyan("  Public Commands:"));
+  console.log(
+    chalk.gray("    docstalk ask <query>         Ask a question to the AI")
+  );
+  console.log(
+    chalk.gray("    docstalk search <query>      Search documentation")
+  );
+  console.log(chalk.gray("    docstalk version             Show version info"));
+  console.log(chalk.gray("    docstalk help                Show this help\n"));
+
+  console.log(chalk.cyan("  Developer Commands:"));
+  console.log(chalk.gray("    docstalk dev                 Show dev commands"));
+  console.log(chalk.gray("    docstalk dev serve           Start dev server"));
+  console.log(
+    chalk.gray("    docstalk dev scrape          Scrape documentation")
+  );
+  console.log(
+    chalk.gray("    docstalk dev index           Index documentation")
+  );
+  console.log(
+    chalk.gray("    docstalk dev test-router     Test routing logic\n")
+  );
+
+  console.log(chalk.white.bold("💡 Examples:\n"));
+  console.log(chalk.gray('  $ docstalk ask "how to use react hooks?"'));
+  console.log(chalk.gray('  $ docstalk ask "docker compose" --source docker'));
+  console.log(chalk.gray("  $ docstalk dev scrape react --incremental\n"));
+
+  console.log(chalk.white.bold("🔗 More Info:\n"));
+  console.log(
+    chalk.gray("  Documentation: https://github.com/hk-dev13/docstalk")
+  );
+  console.log(
+    chalk.gray("  Report Issues: https://github.com/hk-dev13/docstalk/issues\n")
+  );
+}
+
+// ============================================================================
 // MAIN PROGRAM
 // ============================================================================
 
@@ -121,7 +207,17 @@ const program = new Command();
 program
   .name("docstalk")
   .description("AI-powered documentation assistant")
-  .version("0.3.1-alpha");
+  .version("0.3.1-alpha", "-v, --version", "Show version")
+  .helpOption("-h, --help", "Show help")
+  .addHelpCommand(false); // Disable default help, use custom
+
+// Custom help command
+program
+  .command("help")
+  .description("Show help information")
+  .action(() => {
+    showHelp();
+  });
 
 // ============================================================================
 // PUBLIC COMMANDS (Always visible to end users)
@@ -242,11 +338,7 @@ program
   .command("version")
   .description("Show version information")
   .action(() => {
-    console.log(chalk.blue("DocsTalk CLI"));
-    console.log(`Version: ${chalk.green("0.3.1-alpha")}`);
-    console.log(
-      `Mode: ${isDev ? chalk.yellow("Development") : chalk.green("Production")}`
-    );
+    showBanner();
   });
 
 // ============================================================================

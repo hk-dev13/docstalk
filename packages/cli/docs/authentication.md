@@ -1,18 +1,18 @@
 # DocsTalk CLI - Authentication & Security
 
 **Version:** 0.3.1-alpha  
-**Updated:** December 2, 2025  
-**Security Level:** Multi-Layer Protection
+**Updated:** December 4, 2025  
+**Security Model:** Token-Based Access Control
 
 ---
 
 ## 🔒 Overview
 
-Developer commands (`docstalk dev *`) are **protected** dengan multi-layer authentication untuk prevent unauthorized access ke database dan infrastructure.
+Developer commands (`docstalk dev *`) are **protected** with token-based authentication to prevent unauthorized access to database and infrastructure operations.
 
 ---
 
-## 🛡️ Security Layers
+## 🛡️ Security Design
 
 ### Layer 1: Admin Token
 
@@ -20,16 +20,15 @@ Developer commands (`docstalk dev *`) are **protected** dengan multi-layer authe
 
 **Format:** Must start with `dtalk_admin_`
 
-**Purpose:** Primary authentication mechanism
+**Purpose:** Primary authentication credential
 
 ---
 
-### Layer 2: Project Context OR Remote Token
+### Layer 2: Environment Context
 
-**Option A:** Run inside DocsTalk project  
-**Option B:** Provide `DOCSTALK_REMOTE_TOKEN`
+**Requirement:** Valid deployment credential or environment context
 
-**Purpose:** Prevent arbitrary remote access
+**Purpose:** Ensures commands run in authorized environments
 
 ---
 
@@ -37,7 +36,7 @@ Developer commands (`docstalk dev *`) are **protected** dengan multi-layer authe
 
 **Check:** Token must match expected pattern
 
-**Purpose:** Prevent accidental or malicious token injection
+**Purpose:** Prevents accidental or malicious credential usage
 
 ---
 
@@ -60,19 +59,21 @@ docstalk dev index react
 
 ---
 
-### For Remote Access (Production)
+### For Remote Access (Production/CI)
 
 ```bash
 # 1. Set admin token
 export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_SECRET_KEY_HERE
 
-# 2. Set remote token (same as admin token)
-export DOCSTALK_REMOTE_TOKEN=dtalk_admin_YOUR_SECRET_KEY_HERE
+# 2. Set deployment credential
+export DOCSTALK_REMOTE_TOKEN=dtalk_admin_DEPLOYMENT_SCOPED_KEY
 
-# 3. Run commands from anywhere
+# 3. Run commands from automation
 docstalk dev scrape react --incremental
 docstalk dev index react
 ```
+
+**Note:** `DOCSTALK_REMOTE_TOKEN` should be a deployment-scoped credential linked to admin permissions. Do not use the same value in production environments.
 
 ---
 
@@ -81,7 +82,7 @@ docstalk dev index react
 ### Recommended Method
 
 ```bash
-# Generate random secure token
+# Generate cryptographically secure token
 node -e "console.log('dtalk_admin_' + require('crypto').randomBytes(32).toString('hex'))"
 
 # Output example:
@@ -90,79 +91,64 @@ node -e "console.log('dtalk_admin_' + require('crypto').randomBytes(32).toString
 
 ---
 
-### Manual Method
+### Token Requirements
 
-```bash
-# Create your own (minimum 32 characters after prefix)
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_my_super_secret_key_12345678901234567890
-```
+| Requirement    | Value          | Reason                     |
+| -------------- | -------------- | -------------------------- |
+| **Prefix**     | `dtalk_admin_` | Identifies admin tokens    |
+| **Min Length** | 44+ chars      | Sufficient entropy         |
+| **Randomness** | High           | Prevents guessing          |
+| **Storage**    | Encrypted      | Protects at rest           |
 
 ---
 
-## ⚠️ What Happens Without Authentication
+## ⚠️ Authentication Errors
 
-### Attempt to Use Dev Commands
+### Common Error Messages
 
 ```bash
-# Without token
-docstalk dev serve
-```
-
-**Output:**
-
-```
+# Insufficient credentials
 🔒 Permission Denied: dev serve
 
 Developer commands require authentication.
-
-Reason: DOCSTALK_ADMIN_TOKEN environment variable not set
-
-To use developer commands:
-1. Set DOCSTALK_ADMIN_TOKEN environment variable
-   export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_SECRET_KEY
-
-2. Either:
-   - Run inside DocsTalk project directory, OR
-   - Set DOCSTALK_REMOTE_TOKEN for remote access
-
-📖 See docs: packages/cli/docs/authentication.md
 ```
 
 **Exit Code:** 1
+
+**Resolution:** Set required environment variables and ensure proper context.
 
 ---
 
 ## ✅ Valid Use Cases
 
-### Case 1: Local Development (Recommended)
+### Case 1: Local Development
 
 ```bash
-# Setup
+# Inside project directory
 cd ~/projects/docstalk
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_dev_local_123...
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_dev_local_KEY
 
-# Use
+# Commands work with admin token only
 docstalk dev serve
 docstalk dev scrape react
-docstalk dev index react
 
-✅ Allowed: Inside project + valid token
+✅ Allowed: Authorized environment
 ```
 
 ---
 
-### Case 2: Remote Access (CI/CD)
+### Case 2: CI/CD Automation
 
 ```bash
-# Setup (not in project directory)
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_ci_prod_456...
-export DOCSTALK_REMOTE_TOKEN=dtalk_admin_ci_prod_456...
+# Automated environment
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_ci_KEY
+export DOCSTALK_REMOTE_TOKEN=dtalk_admin_deploy_KEY
 
-# Use
+# Run automation commands
 docstalk dev scrape react --incremental
 docstalk dev index react
 
-✅ Allowed: Valid remote token
+✅ Allowed: Valid deployment credentials
 ```
 
 ---
@@ -170,28 +156,27 @@ docstalk dev index react
 ### Case 3: Production Deployment
 
 ```bash
-# On production server
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_prod_789...
-export DOCSTALK_REMOTE_TOKEN=dtalk_admin_prod_789...
+# Production server with proper credentials
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_prod_KEY
+export DOCSTALK_REMOTE_TOKEN=dtalk_admin_prod_deploy_KEY
 
-# Automated sync
+# Automated documentation sync
 docstalk dev scrape react --incremental --index
-docstalk dev scrape nextjs --incremental --index
 
-✅ Allowed: Valid tokens for automation
+✅ Allowed: Authorized automation
 ```
 
 ---
 
 ## ❌ Invalid Use Cases
 
-### Case 1: No Token
+### Case 1: Missing Credentials
 
 ```bash
-# Missing DOCSTALK_ADMIN_TOKEN
+# No token set
 docstalk dev serve
 
-❌ Denied: No admin token
+❌ Denied: Insufficient authorization
 ```
 
 ---
@@ -199,41 +184,23 @@ docstalk dev serve
 ### Case 2: Invalid Token Format
 
 ```bash
-# Wrong prefix
-export DOCSTALK_ADMIN_TOKEN=my_random_token_123
+# Incorrect prefix
+export DOCSTALK_ADMIN_TOKEN=my_random_token
 
 docstalk dev serve
 
-❌ Denied: Token must start with 'dtalk_admin_'
+❌ Denied: Invalid credential format
 ```
 
 ---
 
-### Case 3: Not in Project + No Remote Token
+### Case 3: Unauthorized Context
 
 ```bash
-# Outside project
-cd /tmp
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_valid_token
-
-# No DOCSTALK_REMOTE_TOKEN
+# Missing required context
 docstalk dev serve
 
-❌ Denied: Must be in project OR provide remote token
-```
-
----
-
-### Case 4: Mismatched Tokens
-
-```bash
-# Different tokens
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_token_A
-export DOCSTALK_REMOTE_TOKEN=dtalk_admin_token_B
-
-docstalk dev serve
-
-❌ Denied: Remote token must match admin token
+❌ Denied: Unauthorized environment
 ```
 
 ---
@@ -244,28 +211,32 @@ docstalk dev serve
 
 ```bash
 # Development
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_dev_abc123...
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_dev_KEY
 
 # Staging
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_staging_def456...
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_staging_KEY
 
-# Production
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_prod_ghi789...
+# Production  
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_prod_KEY
 ```
+
+**Best Practice:** Use different tokens per environment.
 
 ---
 
-### Team Access
+### Secure Token Storage
+
+**Recommended Solutions:**
+
+- 1Password Teams
+- HashiCorp Vault
+- AWS Secrets Manager
+- Azure Key Vault
+- Environment variable management
 
 ```bash
-# Share token securely via:
-# - 1Password
-# - HashiCorp Vault
-# - AWS Secrets Manager
-# - Environment variable management system
-
-# Each team member sets:
-export DOCSTALK_ADMIN_TOKEN=$(vault read secret/docstalk/admin_token)
+# Example: Vault integration
+export DOCSTALK_ADMIN_TOKEN=$(vault read -field=value secret/docstalk/admin)
 ```
 
 ---
@@ -279,8 +250,8 @@ export DOCSTALK_ADMIN_TOKEN=$(vault read secret/docstalk/admin_token)
 name: Sync Documentation
 
 env:
-  DOCSTALK_ADMIN_TOKEN: ${{ secrets.DOCSTALK_ADMIN_TOKEN }}
-  DOCSTALK_REMOTE_TOKEN: ${{ secrets.DOCSTALK_ADMIN_TOKEN }}
+  DOCSTALK_ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+  DOCSTALK_REMOTE_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
 
 jobs:
   sync:
@@ -297,8 +268,8 @@ jobs:
 # .gitlab-ci.yml
 sync_docs:
   variables:
-    DOCSTALK_ADMIN_TOKEN: $DOCSTALK_ADMIN_TOKEN
-    DOCSTALK_REMOTE_TOKEN: $DOCSTALK_ADMIN_TOKEN
+    DOCSTALK_ADMIN_TOKEN: $ADMIN_TOKEN
+    DOCSTALK_REMOTE_TOKEN: $DEPLOY_TOKEN
   script:
     - npm install -g @docstalk/cli
     - docstalk dev scrape react --incremental --index
@@ -306,14 +277,14 @@ sync_docs:
 
 ---
 
-## 🔄 Token Rotation
+## 🔄 Token Management
 
 ### When to Rotate
 
-- ✅ Every 90 days (best practice)
-- ✅ After team member leaves
-- ✅ Suspected compromise
-- ✅ Regular security audit
+- ✅ Every 90 days (recommended)
+- ✅ After access changes
+- ✅ Suspected security issue
+- ✅ Regular security audits
 
 ### How to Rotate
 
@@ -325,13 +296,12 @@ NEW_TOKEN=$(node -e "console.log('dtalk_admin_' + require('crypto').randomBytes(
 export DOCSTALK_ADMIN_TOKEN=$NEW_TOKEN
 
 # 3. Update secrets manager
-vault write secret/docstalk/admin_token value=$NEW_TOKEN
+vault write secret/docstalk/admin value=$NEW_TOKEN
 
-# 4. Update CI/CD secrets
-# (via GitHub/GitLab UI)
+# 4. Update CI/CD secrets (via UI)
 
-# 5. Notify team
-echo "Token rotated on $(date)" | mail -s "DocsTalk Token Rotation" team@company.com
+# 5. Verify
+docstalk dev serve
 ```
 
 ---
@@ -340,120 +310,72 @@ echo "Token rotated on $(date)" | mail -s "DocsTalk Token Rotation" team@company
 
 ### ✅ DO
 
-- ✅ Use strong, random tokens
+- ✅ Use cryptographically secure tokens
 - ✅ Store tokens in secrets manager
 - ✅ Rotate tokens regularly
-- ✅ Use different tokens per environment
-- ✅ Audit token usage
-- ✅ Revoke immediately on compromise
+- ✅ Use separate tokens per environment
+- ✅ Audit access patterns
+- ✅ Revoke on security events
 
 ### ❌ DON'T
 
-- ❌ Commit tokens to git
-- ❌ Share tokens via email/slack
-- ❌ Use weak/predictable tokens
+- ❌ Commit tokens to version control
+- ❌ Share tokens via public channels
+- ❌ Use predictable tokens
 - ❌ Reuse tokens across environments
-- ❌ Share one token across team
 - ❌ Log tokens in plain text
-
----
-
-## 📊 Token Requirements
-
-| Requirement    | Value          | Reason                           |
-| -------------- | -------------- | -------------------------------- |
-| **Prefix**     | `dtalk_admin_` | Identifies DocsTalk admin tokens |
-| **Min Length** | 44+ chars      | Sufficient entropy               |
-| **Randomness** | High           | Prevents brute force             |
-| **Rotation**   | Every 90 days  | Limits exposure window           |
-| **Storage**    | Encrypted      | Protects at rest                 |
+- ❌ Expose tokens in error messages
 
 ---
 
 ## 🔍 Troubleshooting
 
-### Error: "DOCSTALK_ADMIN_TOKEN environment variable not set"
+### Debug Mode
 
-**Solution:**
+For detailed error information, set:
 
+```bash
+export DOCSTALK_DEBUG=1
+```
+
+This provides verbose logging for troubleshooting authorization issues.
+
+---
+
+### Common Solutions
+
+**Missing credentials:**
 ```bash
 export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_KEY
 ```
 
----
-
-### Error: "Invalid admin token format"
-
-**Solution:**
-
+**Invalid format:**
 ```bash
-# Token must start with 'dtalk_admin_'
+# Ensure correct prefix
 export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_KEY
-#                           ^^^^^^^^^^^^^^ Must have this prefix
+#                           ^^^^^^^^^^^^^^ Required prefix
 ```
 
----
-
-### Error: "Must be inside DocsTalk project or provide DOCSTALK_REMOTE_TOKEN"
-
-**Solution A:** CD into project
-
+**For automation:**
 ```bash
-cd /path/to/docstalk
-docstalk dev serve
-```
-
-**Solution B:** Set remote token
-
-```bash
-export DOCSTALK_REMOTE_TOKEN=$DOCSTALK_ADMIN_TOKEN
-docstalk dev serve
-```
-
----
-
-### Error: "Invalid remote token"
-
-**Solution:**
-
-```bash
-# Remote token must match admin token
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_abc123
-export DOCSTALK_REMOTE_TOKEN=dtalk_admin_abc123
-#                             ^^^^^^^^^^^^^^^^^^^ Must be same
+# Set both credentials
+export DOCSTALK_ADMIN_TOKEN=dtalk_admin_KEY
+export DOCSTALK_REMOTE_TOKEN=dtalk_admin_DEPLOY_KEY
 ```
 
 ---
 
 ## 🎯 Quick Reference
 
-### Setup Commands
-
-```bash
-# Generate token
-node -e "console.log('dtalk_admin_' + require('crypto').randomBytes(32).toString('hex'))"
-
-# Set for local dev
-export DOCSTALK_ADMIN_TOKEN=dtalk_admin_YOUR_KEY
-
-# Set for remote access
-export DOCSTALK_REMOTE_TOKEN=$DOCSTALK_ADMIN_TOKEN
-
-# Verify
-echo $DOCSTALK_ADMIN_TOKEN
-```
-
----
-
 ### Protected Commands
 
 All `docstalk dev *` commands require authentication:
 
 ```bash
-docstalk dev serve        # 🔒 Protected
-docstalk dev scrape       # 🔒 Protected
-docstalk dev index        # 🔒 Protected
-docstalk dev test-router  # 🔒 Protected
+docstalk dev serve        # 🔒 Auth required
+docstalk dev scrape       # 🔒 Auth required
+docstalk dev index        # 🔒 Auth required
+docstalk dev test-router  # 🔒 Auth required
 ```
 
 ---
@@ -475,25 +397,26 @@ docstalk help             # ✅ Public
 
 **Security Model:**
 
-- 🔒 Multi-layer authentication
-- 🔑 Admin token required
-- 🏗️ Project context OR remote token
+- � Token-based access control
+- 🏗️ Multi-step authentication flow
 - ✅ Format validation
+- 🔒 Environment context verification
 
 **Benefits:**
 
-- 🛡️ Prevents unauthorized access
-- 🔐 Protects database integrity
-- 📊 Audit trail possible
-- 🚀 Production-ready
+- 🛡️ Prevents unauthorized operations
+- 🔐 Protects data integrity
+- 📊 Enables access auditing
+- 🚀 Production-ready design
 
 **Developer Experience:**
 
-- ✅ Simple setup (one env var)
-- ✅ Clear error messages
+- ✅ Simple credential setup
+- ✅ Clear feedback on issues
 - ✅ Flexible deployment options
-- ✅ No impact on public commands
+- ✅ Zero impact on public commands
 
 ---
 
-**Developer commands are now secure by default!** 🔒🚀
+**For detailed security questions, contact your security team or review our security policy.**
+
