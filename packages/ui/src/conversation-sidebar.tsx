@@ -11,7 +11,9 @@ import {
   History,
   Pin,
   PinOff,
+  Settings,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "./button";
 import { cn } from "./lib/utils";
 import { Skeleton } from "./skeleton";
@@ -414,6 +416,26 @@ export function ConversationSidebar({
               )}
             </div>
           )}
+        </div>
+
+        {/* Footer */}
+        <div
+          className={cn(
+            "p-2 border-t border-border/50",
+            isCollapsed && "flex justify-center"
+          )}
+        >
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors",
+              isCollapsed && "px-2 justify-center"
+            )}
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+            {!isCollapsed && <span>Settings</span>}
+          </Link>
         </div>
       </div>
     </>
