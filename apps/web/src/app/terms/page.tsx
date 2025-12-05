@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { GridPattern, cn } from "@docstalk/ui";
+import { GridPattern, cn, Button } from "@docstalk/ui";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -9,34 +8,38 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden flex flex-col">
       <GridPattern
-        id="terms-grid"
         width={50}
         height={50}
         x={-1}
         y={-1}
         className={cn(
-          "[mask-[linear-gradient(to_bottom_right,white,transparent,transparent)] ",
+          "mask-[linear-gradient(to_bottom_right,white,transparent,transparent)]",
           "opacity-50"
         )}
       />
 
-      <div className="max-w-4xl mx-auto px-6 py-12 relative z-10">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8 group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          Back to Home
-        </Link>
+      {/* Header */}
+      <header className="fixed top-0 w-full z-50 glass-header px-6 py-4 border-b border-border/50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 font-bold text-xl">
+            DocsTalk
+          </Link>
+          <Link href="/chat">
+            <Button variant="ghost">Back to Chat</Button>
+          </Link>
+        </div>
+      </header>
 
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-          Terms of Service
-        </h1>
-        <p className="text-muted-foreground mb-12">
-          Last updated: December 6, 2025
-        </p>
+      <main className="flex-1 pt-32 pb-20 px-4 relative z-10">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-center">
+            Terms of Service
+          </h1>
+          <p className="text-muted-foreground mb-12 text-center">
+            Last updated: December 6, 2025
+          </p>
 
         <div className="prose prose-invert max-w-none space-y-8">
           <section>
@@ -112,7 +115,8 @@ export default function TermsPage() {
             </p>
           </section>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
