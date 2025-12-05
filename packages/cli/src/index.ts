@@ -151,7 +151,7 @@ function showBanner() {
   );
   console.log(
     chalk.gray(
-      `   Docs: ${chalk.blue("https://github.com/hk-dev13/docstalk")}\n`
+      `   Docs: ${chalk.blue("https://docstalk.envoyou.com")}\n`
     )
   );
 }
