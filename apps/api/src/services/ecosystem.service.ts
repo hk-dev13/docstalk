@@ -99,7 +99,7 @@ export class EcosystemService {
   ): EcosystemDetectionResult | null {
     for (const ecosystem of ecosystems) {
       if (
-        ecosystem.aliases?.some((alias) => query.includes(alias.toLowerCase()))
+        ecosystem.aliases?.some((alias: string) => query.includes(alias.toLowerCase()))
       ) {
         return {
           ecosystem,
@@ -123,7 +123,7 @@ export class EcosystemService {
       let score = 0;
 
       // Check primary keywords
-      ecosystem.keywords.forEach((kw) => {
+      ecosystem.keywords.forEach((kw: string) => {
         if (query.includes(kw.toLowerCase())) score += 10;
       });
 
@@ -131,7 +131,7 @@ export class EcosystemService {
       if (ecosystem.keyword_groups) {
         Object.values(ecosystem.keyword_groups)
           .flat()
-          .forEach((kw) => {
+          .forEach((kw: string) => {
             if (query.includes(kw.toLowerCase())) score += 5;
           });
       }

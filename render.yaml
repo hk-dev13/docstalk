@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     region: singapore # Change to your preferred region
-    buildCommand: pnpm install && pnpm --filter @docstalk/api build
+    buildCommand: pnpm install && pnpm --filter @docstalk/api... build
     startCommand: pnpm --filter @docstalk/api start
     envVars:
       - key: NODE_VERSION
