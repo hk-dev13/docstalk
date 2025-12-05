@@ -133,7 +133,7 @@ function showBanner() {
 ║   ╚═════╝  ╚═════╝  ╚═════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═╝  ╚═╝
 ║                                                                ║
 ║   ${chalk.white.bold(
-      "AI-Powered Documentation Assistant"
+      "Smart Documentation Assistant"
     )}                      ║
 ║   ${chalk.gray(
       "Ask questions, get instant answers from official docs"
@@ -144,7 +144,7 @@ function showBanner() {
   );
   console.log(
     chalk.gray(
-      `   Version: ${chalk.green("v0.3.1-alpha")}  |  Mode: ${
+      `   Version: ${chalk.green("v0.3.6-alpha")}  |  Mode: ${
         isDev ? chalk.yellow("Development") : chalk.green("Production")
       }`
     )
@@ -206,7 +206,7 @@ function showHelp() {
 
   console.log(chalk.white.bold("🔗 More Info:\n"));
   console.log(
-    chalk.gray("  Documentation: https://github.com/hk-dev13/docstalk")
+    chalk.gray("  Documentation: https://docstalk.envoyou.com")
   );
   console.log(
     chalk.gray("  Report Issues: https://github.com/hk-dev13/docstalk/issues\n")
@@ -222,7 +222,7 @@ const program = new Command();
 program
   .name("docstalk")
   .description("AI-powered documentation assistant")
-  .version("0.3.1-alpha", "-v, --version", "Show version");
+  .version("0.3.6-alpha", "-v, --version", "Show version");
 
 // ============================================================================
 // CONFIG COMMANDS
@@ -304,7 +304,7 @@ program
     try {
       const url =
         process.env.DOCSTALK_API_URL || "https://api.docstalk.envoyou.com";
-      const token = process.env.DOCSTALK_API_TOKEN;
+      const token = process.env.DOCSTALK_API_TOKEN || getToken();
 
       if (!token) {
         console.warn(
@@ -629,7 +629,7 @@ devCommand
     try {
       const url =
         process.env.DOCSTALK_API_URL || "https://api.docstalk.envoyou.com";
-      const token = getToken();
+      const token = process.env.DOCSTALK_API_TOKEN || getToken();
       const endpoint = `${url}/api/v1/chat/auto/stream`;
 
       const body = {

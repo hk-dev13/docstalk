@@ -195,7 +195,7 @@ DocsTalk comes with a powerful CLI tool for managing documentation:
 # Install CLI globally
 npm install -g @docstalk/cli
 
-# Or use from project
+# Or use from project (for development)
 cd packages/cli
 pnpm link --global
 ```

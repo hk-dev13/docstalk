@@ -29,6 +29,18 @@ export const authMiddleware = async (
 
     const token = authHeader.split(" ")[1];
 
+    // Check for static API token (System/CLI access)
+    if (
+      process.env.DOCSTALK_API_TOKEN &&
+      token === process.env.DOCSTALK_API_TOKEN
+    ) {
+      request.auth = {
+        userId: "system_cli",
+        claims: { email: "cli@docstalk.system" },
+      };
+      return;
+    }
+
     // Verify token using Clerk
     // Note: verifyToken returns the claims if valid, throws if invalid
     const claims = await clerk.verifyToken(token);
