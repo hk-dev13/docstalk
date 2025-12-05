@@ -161,6 +161,26 @@ export default function HomePage() {
       icon: "/assets/support_docs/icons8-go.svg",
       url: "https://go.dev/doc",
     },
+    {
+      name: "Docker",
+      icon: "/assets/support_docs/icons8-docker.svg",
+      url: "https://docs.docker.com/",
+    },
+    {
+      name: "Vue",
+      icon: "/assets/support_docs/icons8-vue.svg",
+      url: "https://vuejs.org/",
+    },
+    {
+      name: "PostgreSQL",
+      icon: "/assets/support_docs/icons8-postgresql.svg",
+      url: "https://www.postgresql.org/docs/",
+    },
+    {
+      name: "FastAPI",
+      icon: "/assets/support_docs/icons8-fastapi.svg",
+      url: "https://fastapi.tiangolo.com/",
+    },
   ];
 
   const faqs = [
