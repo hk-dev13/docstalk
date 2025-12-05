@@ -1,4 +1,4 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -8,8 +8,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/backend/:path*',
-        destination: 'http://localhost:3001/api/v1/:path*',
+        source: "/api/backend/:path*",
+        destination: `${
+          process.env.BACKEND_URL || "http://localhost:3001"
+        }/api/v1/:path*`,
       },
     ];
   },
