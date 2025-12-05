@@ -464,7 +464,16 @@ Always reply in user language even if not configured.`,
       },
     };
 
-    return modes[mode] || modes["auto"]; // Default to auto
+    const IDENTITY_PREAMBLE =
+      "You are **DocsTalk**, an intelligent AI documentation assistant.";
+
+    const selectedMode = modes[mode] || modes["auto"];
+
+    // Merge global identity with specific persona
+    return {
+      persona: `${IDENTITY_PREAMBLE}\n${selectedMode.persona}`,
+      style: selectedMode.style,
+    };
   }
 
   /**
@@ -599,10 +608,22 @@ Content: ${result.content}
     const { persona, style } = this.getResponseModePersona(responseMode);
 
     // 6. BUILD THE GLOBAL-READY PROMPT
+    const currentDate = new Date().toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
     const prompt = `
 ${persona}
 
 ${historyContext}
+
+**System Context:**
+- **Current Date:** ${currentDate}
+- **Project Environment:** The user is working in a monorepo with **Next.js 16.0.3** (App Router), **React 19.0.0**, **Tailwind CSS 4.0**, and **Supabase**.
+- **Role:** You are DocsTalk. You are aware of the latest 2024/2025 web technologies.
 
 **User Question:** "${query}"
 
@@ -619,12 +640,24 @@ ${context || "No specific documentation found for this query."}
    - Even if the "Documentation Context" is in English, you **MUST TRANSLATE** the answer into the User's language.
    - Do NOT mix languages unless it's for standard code terms (like 'middleware', 'function').
 
-**2. INTELLIGENT RETRIEVAL:**
-   - **Step A:** Check if the "Available Documentation Context" contains the answer to the User Question.
-   - **Step B (Strict RAG):** IF the context is relevant, use it to answer and cite the [URL] at the end.
-   - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** (e.g., user asks about "VPS Deployment" but context is just "syntax definitions") OR **empty**, explicitly IGNORE the context constraints.
-     - Instead, answer the question using your **General Expert Knowledge** to be helpful.
-     - If answering from general knowledge, do NOT invent fake source URLs.
+
+
+**2. RETRIEVAL & IDENTITY LOGIC (EXECUTE IN ORDER):**
+   - **CASE A (Identity Query):** IF the user asks "Who are you?", "What is this?", "What is DocsTalk?", or similar identity questions:
+     - **IGNORE** missing context.
+     - **ANSWER** as "**DocsTalk**", the AI documentation assistant for developers.
+     - Briefly explain your purpose (helping devs navigate docs).
+
+   - **CASE B (Context Available):** IF the "Available Documentation Context" below is **relevant** to the user's question:
+     - Use the context to answer accuratey.
+     - You MUST cite the [Source URL] at the end of your answer.
+
+   - **CASE C (General Fallback):** IF the context is **empty** OR **irrelevant** (and it's NOT an identity question):
+     - **CRITICAL:** If asking about versions of libraries (Next.js, React, etc.), **TRUST the 'Project Environment' info** provided above.
+       - Example: If Project Env says Next.js 16, ACKNOWLEDGE it is Next.js 16 (even if your training says 14).
+     - Answer using your **General Expert Knowledge** as a Senior Developer.
+     - Do NOT invent fake URLs.
+     - Explicitly mention you are answering from general knowledge.
 
 **3. FORMATTING:**
 ${style}

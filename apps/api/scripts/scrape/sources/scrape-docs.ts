@@ -23,44 +23,54 @@ const DOC_CONFIGS = {
   nextjs: {
     name: "Next.js",
     baseUrl: "https://nextjs.org",
-    startUrls: ["https://nextjs.org/docs"],
-    urlPattern: /^https:\/\/nextjs\.org\/docs/,
-    maxPages: 200, // Free tier friendly
+    startUrls: ["https://nextjs.org/docs", "https://nextjs.org/blog"],
+    urlPattern: /^https:\/\/nextjs\.org\/(docs|blog)/,
+    maxPages: 250,
   },
   react: {
     name: "React",
     baseUrl: "https://react.dev",
-    startUrls: ["https://react.dev/learn", "https://react.dev/reference"],
-    urlPattern: /^https:\/\/react\.dev\/(learn|reference)/,
-    maxPages: 200,
+    startUrls: [
+      "https://react.dev/learn",
+      "https://react.dev/reference",
+      "https://react.dev/blog",
+    ],
+    urlPattern: /^https:\/\/react\.dev\/(learn|reference|blog)/,
+    maxPages: 250,
   },
   typescript: {
     name: "TypeScript",
     baseUrl: "https://www.typescriptlang.org",
-    startUrls: ["https://www.typescriptlang.org/docs/handbook"],
+    startUrls: [
+      "https://www.typescriptlang.org/docs/handbook",
+      "https://www.typescriptlang.org/docs/handbook/release-notes/overview.html",
+    ],
     urlPattern: /^https:\/\/www\.typescriptlang\.org\/docs/,
-    maxPages: 200,
+    maxPages: 250,
   },
   nodejs: {
     name: "Node.js",
     baseUrl: "https://nodejs.org",
-    startUrls: ["https://nodejs.org/docs/latest/api/"],
-    urlPattern: /^https:\/\/nodejs\.org\/docs\/latest\/api/,
-    maxPages: 200,
+    startUrls: [
+      "https://nodejs.org/docs/latest/api/",
+      "https://nodejs.org/en/blog/release/",
+    ],
+    urlPattern: /^https:\/\/nodejs\.org\/(docs\/latest\/api|en\/blog\/release)/,
+    maxPages: 250,
   },
   tailwind: {
     name: "Tailwind CSS",
     baseUrl: "https://tailwindcss.com",
-    startUrls: ["https://tailwindcss.com/docs"],
-    urlPattern: /^https:\/\/tailwindcss\.com\/docs/,
-    maxPages: 200,
+    startUrls: ["https://tailwindcss.com/docs", "https://tailwindcss.com/blog"],
+    urlPattern: /^https:\/\/tailwindcss\.com\/(docs|blog)/,
+    maxPages: 250,
   },
   prisma: {
     name: "Prisma",
     baseUrl: "https://www.prisma.io",
-    startUrls: ["https://www.prisma.io/docs"],
-    urlPattern: /^https:\/\/www\.prisma\.io\/docs/,
-    maxPages: 200,
+    startUrls: ["https://www.prisma.io/docs", "https://www.prisma.io/blog"],
+    urlPattern: /^https:\/\/www\.prisma\.io\/(docs|blog)/,
+    maxPages: 250,
   },
   express: {
     name: "Express",
@@ -72,23 +82,29 @@ const DOC_CONFIGS = {
   python: {
     name: "Python",
     baseUrl: "https://docs.python.org/3/",
-    startUrls: ["https://docs.python.org/3/tutorial/index.html"],
-    urlPattern: /^https:\/\/docs\.python\.org\/3/,
-    maxPages: 200,
+    startUrls: [
+      "https://docs.python.org/3/tutorial/index.html",
+      "https://docs.python.org/3/whatsnew/index.html",
+    ],
+    urlPattern: /^https:\/\/docs\.python\.org\/3\/(tutorial|whatsnew|library)/,
+    maxPages: 250,
   },
   rust: {
     name: "Rust",
     baseUrl: "https://doc.rust-lang.org",
-    startUrls: ["https://doc.rust-lang.org/book/"],
-    urlPattern: /^https:\/\/doc\.rust-lang\.org\/book/,
-    maxPages: 200,
+    startUrls: [
+      "https://doc.rust-lang.org/book/",
+      "https://doc.rust-lang.org/edition-guide/",
+    ],
+    urlPattern: /^https:\/\/doc\.rust-lang\.org\/(book|edition-guide)/,
+    maxPages: 250,
   },
   go: {
     name: "Go",
     baseUrl: "https://go.dev",
-    startUrls: ["https://go.dev/doc/"],
+    startUrls: ["https://go.dev/doc/", "https://go.dev/doc/devel/release"],
     urlPattern: /^https:\/\/go\.dev\/doc/,
-    maxPages: 200,
+    maxPages: 250,
   },
   docker: {
     name: "Docker",
@@ -97,10 +113,11 @@ const DOC_CONFIGS = {
       "https://docs.docker.com/get-started/",
       "https://docs.docker.com/guides/",
       "https://docs.docker.com/reference/",
+      "https://docs.docker.com/engine/release-notes/",
     ],
     urlPattern:
       /^https:\/\/docs\.docker\.com\/(get-started|guides|reference|engine|compose|build|desktop)/,
-    maxPages: 150,
+    maxPages: 200,
   },
   fastapi: {
     name: "FastAPI",
@@ -108,10 +125,11 @@ const DOC_CONFIGS = {
     startUrls: [
       "https://fastapi.tiangolo.com/tutorial/",
       "https://fastapi.tiangolo.com/advanced/",
+      "https://fastapi.tiangolo.com/release-notes/",
     ],
     urlPattern:
-      /^https:\/\/fastapi\.tiangolo\.com\/(tutorial|advanced|deployment|reference)/,
-    maxPages: 150,
+      /^https:\/\/fastapi\.tiangolo\.com\/(tutorial|advanced|deployment|reference|release-notes)/,
+    maxPages: 200,
   },
   vue: {
     name: "Vue.js",
@@ -119,19 +137,20 @@ const DOC_CONFIGS = {
     startUrls: [
       "https://vuejs.org/guide/introduction.html",
       "https://vuejs.org/api/",
+      "https://vuejs.org/about/blog.html",
     ],
-    urlPattern: /^https:\/\/vuejs\.org\/(guide|api)/,
-    maxPages: 150,
+    urlPattern: /^https:\/\/vuejs\.org\/(guide|api|about)/,
+    maxPages: 200,
   },
   postgresql: {
     name: "PostgreSQL",
     baseUrl: "https://www.postgresql.org/docs/current/",
     startUrls: [
-      "https://www.postgresql.org/docs/current/tutorial.html",
-      "https://www.postgresql.org/docs/current/sql.html",
+      "https://www.postgresql.org/docs/current/index.html",
+      "https://www.postgresql.org/docs/release/",
     ],
-    urlPattern: /^https:\/\/www\.postgresql\.org\/docs\/current/,
-    maxPages: 150,
+    urlPattern: /^https:\/\/www\.postgresql\.org\/docs\/(current|release)/,
+    maxPages: 200,
   },
 };
 
@@ -573,18 +592,18 @@ async function main() {
   }
 
   console.log(`\n🚀 DocsTalk Documentation Scraper\n`);
-  
+
   if (flags.incremental) {
     console.log(`⚡ Incremental mode: Will compare with existing data\n`);
   }
 
   const chunks = await crawlDocumentation(source);
-  
+
   // Incremental mode: Merge with existing chunks
   if (flags.incremental) {
     const outputDir = path.join(process.cwd(), "data");
     const outputFile = path.join(outputDir, `${source}-chunks.json`);
-    
+
     let existingChunks: DocChunk[] = [];
     try {
       const data = await fs.readFile(outputFile, "utf-8");
@@ -592,25 +611,27 @@ async function main() {
     } catch (e) {
       console.log(`  No existing data found, will create new file\n`);
     }
-    
+
     if (existingChunks.length > 0) {
-      console.log(`  📊 Comparing with ${existingChunks.length} existing chunks...`);
-      
+      console.log(
+        `  📊 Comparing with ${existingChunks.length} existing chunks...`
+      );
+
       // Group by URL for comparison
       const existingByUrl = new Map<string, DocChunk[]>();
-      existingChunks.forEach(chunk => {
+      existingChunks.forEach((chunk) => {
         const urlChunks = existingByUrl.get(chunk.url) || [];
         urlChunks.push(chunk);
         existingByUrl.set(chunk.url, urlChunks);
       });
-      
+
       const newByUrl = new Map<string, DocChunk[]>();
-      chunks.forEach(chunk => {
+      chunks.forEach((chunk) => {
         const urlChunks = newByUrl.get(chunk.url) || [];
         urlChunks.push(chunk);
         newByUrl.set(chunk.url, urlChunks);
       });
-      
+
       // Merge strategy:
       // 1. Keep existing chunks for URLs not in new crawl (unchanged pages)
       // 2. Replace chunks for URLs that were re-scraped
@@ -618,9 +639,9 @@ async function main() {
       let unchangedCount = 0;
       let changedCount = 0;
       let newCount = 0;
-      
+
       // Add all new/changed chunks
-      chunks.forEach(chunk => {
+      chunks.forEach((chunk) => {
         mergedChunks.push(chunk);
         if (existingByUrl.has(chunk.url)) {
           changedCount++;
@@ -628,21 +649,21 @@ async function main() {
           newCount++;
         }
       });
-      
+
       // Add unchanged existing chunks (not in new crawl)
-      existingChunks.forEach(chunk => {
+      existingChunks.forEach((chunk) => {
         if (!newByUrl.has(chunk.url)) {
           mergedChunks.push(chunk);
           unchangedCount++;
         }
       });
-      
+
       console.log(`  ✅ Merge complete:`);
       console.log(`     New pages: ${newCount}`);
       console.log(`     Changed pages: ${changedCount}`);
       console.log(`     Unchanged pages: ${unchangedCount}`);
       console.log(`     Total chunks: ${mergedChunks.length}\n`);
-      
+
       await saveChunks(source, mergedChunks);
     } else {
       await saveChunks(source, chunks);

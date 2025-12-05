@@ -145,6 +145,24 @@ export class RouterService {
     conversationId?: string
   ): Promise<RoutingDecision> {
     try {
+      // 0. Quick Meta Detection (Regex) - Prioritize Self-Identity
+      const metaRegex =
+        /^(who are you|what is (this|docstalk)|(ini|apa) (itu|kah) (docstalk|ini|aplikasi|platform)|siapa (kamu|anda)|(docstalk )?identity|tech stack|tentang docstalk|platform apa ini)/i;
+
+      if (
+        metaRegex.test(query) ||
+        (query.toLowerCase().includes("docstalk") && query.length < 50)
+      ) {
+        return {
+          queryType: "meta",
+          confidence: 100,
+          reasoning:
+            "Direct meta query about DocsTalk identity detected via regex",
+          needsClarification: false,
+          suggestedSources: [],
+        };
+      }
+
       // 1. Ecosystem Detection (Priority)
       const ecosystemResult = await this.ecosystemService.detectEcosystem(
         query
@@ -359,7 +377,7 @@ ${sourcesList}
     ${techStackInfo}
     
     **Instructions:**
-    1. **Detect the language** of the User Query (Indonesian, English, etc.).
+    1. **Detect the language** of the User Query (Indonesian, English, Arabic, Chinese, etc.).
     2. Answer the query naturally in that **SAME LANGUAGE**.
     3. Be helpful, professional, and concise.
     4. If asked about what you can do, mention that you can search specific documentation automatically.
