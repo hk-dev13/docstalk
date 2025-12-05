@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { GridPattern, cn } from "@docstalk/ui";
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+};
 
 export default function TermsPage() {
   return (

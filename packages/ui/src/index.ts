@@ -41,4 +41,6 @@ export { LiquidText } from "./liquid-text";
 export { ModeToggle } from "./mode-toggle";
 export { AuthModal } from "./auth-modal";
 export { ErrorBoundary } from "./error-boundary";
-export { ThemeProvider } from "./theme-provider";
+export { Toaster } from "./sonner";
+export { toast } from "sonner";
+export * from "./theme-provider";

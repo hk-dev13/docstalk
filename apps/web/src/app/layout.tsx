@@ -15,7 +15,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DocsTalk - Smart Documentation Assistant for Developers",
+  title: {
+    default: "DocsTalk - Smart Documentation Assistant",
+    template: "%s | DocsTalk",
+  },
   description:
     "Get accurate answers from official documentation with code examples. Stop reading, start building.",
   icons: {
@@ -24,7 +27,7 @@ export const metadata: Metadata = {
   },
 };
 
-import { ThemeProvider, ErrorBoundary } from "@docstalk/ui";
+import { ThemeProvider, ErrorBoundary, Toaster } from "@docstalk/ui";
 import { ClerkProvider } from "@clerk/nextjs";
 
 export default function RootLayout({
@@ -46,6 +49,7 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               {children}
+              <Toaster />
             </ThemeProvider>
           </ErrorBoundary>
         </body>

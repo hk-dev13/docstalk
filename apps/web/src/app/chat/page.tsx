@@ -29,6 +29,7 @@ import {
   ClarificationFlow,
   RoutingIndicator,
   Button,
+  toast,
 } from "@docstalk/ui";
 import {
   BookOpen,
@@ -503,6 +504,8 @@ export default function ChatPage() {
       } else if (error.message?.includes("401")) {
         errorMessage = "🔒 Please sign in to continue.";
         setShowAuthModal(true);
+      } else {
+        toast.error("Failed to connect. Please try again.");
       }
 
       setMessages((prev) => [
@@ -539,9 +542,10 @@ export default function ChatPage() {
       if (!token) return;
 
       await submitFeedback(messageId, type, token, reason);
-      console.log("Feedback submitted successfully");
+      toast.success("Thank you for your feedback!");
     } catch (error) {
       console.error("Failed to submit feedback:", error);
+      toast.error("Failed to submit feedback");
     }
   };
 
@@ -581,9 +585,7 @@ export default function ChatPage() {
     } else {
       // Fallback to clipboard
       navigator.clipboard.writeText(content);
-      // You might want to add a toast here if available, or just rely on the user noticing
-      // For now we'll just log it as we don't have a toast component ready
-      console.log("Shared to clipboard");
+      toast.success("Response copied to clipboard!");
     }
   };
 

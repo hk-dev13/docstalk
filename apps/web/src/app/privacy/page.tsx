@@ -1,3 +1,9 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+};
+
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { GridPattern, cn } from "@docstalk/ui";
