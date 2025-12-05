@@ -302,7 +302,8 @@ program
     );
 
     try {
-      const url = process.env.DOCSTALK_API_URL || "http://localhost:3001";
+      const url =
+        process.env.DOCSTALK_API_URL || "https://api.docstalk.envoyou.com";
       const token = process.env.DOCSTALK_API_TOKEN;
 
       if (!token) {
@@ -626,7 +627,8 @@ devCommand
     console.log(chalk.blue(`🧪 Testing router: ${query}`));
 
     try {
-      const url = process.env.DOCSTALK_API_URL || "http://localhost:3001";
+      const url =
+        process.env.DOCSTALK_API_URL || "https://api.docstalk.envoyou.com";
       const token = getToken();
       const endpoint = `${url}/api/v1/chat/auto/stream`;
 
