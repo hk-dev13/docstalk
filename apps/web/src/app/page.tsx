@@ -168,7 +168,7 @@ export default function HomePage() {
     },
     {
       name: "Vue",
-      icon: "/assets/support_docs/icons8-vue.svg",
+      icon: "/assets/support_docs/icons8-vue-js.svg",
       url: "https://vuejs.org/",
     },
     {
@@ -262,7 +262,9 @@ export default function HomePage() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/50 border border-border/50 text-xs font-medium text-muted-foreground mb-4">
             <Zap className="w-3 h-3 text-yellow-500" />
-            <span>Now supporting Next.js 16 & React 19</span>
+            <span>
+              Now supporting Docker, Vue.js, FastAPI, PostgreSQL, and more!
+            </span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">
@@ -326,14 +328,19 @@ export default function HomePage() {
                     className="block h-full mx-2"
                   >
                     <div className="flex flex-col items-center justify-center p-6 w-32 h-32 rounded-2xl bg-background border border-border/50 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all group cursor-pointer">
-                      <div className="relative w-12 h-12 mb-3 group-hover:scale-110 transition-transform duration-300">
-                        <Image
-                          src={doc.icon}
-                          alt={`${doc.name} icon`}
-                          fill
-                          className="object-contain"
-                        />
-                      </div>
+                      <div
+                        className="w-12 h-12 mb-3 group-hover:scale-110 transition-transform duration-300 bg-muted-foreground group-hover:bg-primary"
+                        style={{
+                          maskImage: `url(${doc.icon})`,
+                          maskSize: "contain",
+                          maskRepeat: "no-repeat",
+                          maskPosition: "center",
+                          WebkitMaskImage: `url(${doc.icon})`,
+                          WebkitMaskSize: "contain",
+                          WebkitMaskRepeat: "no-repeat",
+                          WebkitMaskPosition: "center",
+                        }}
+                      />
                       <span className="font-medium text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                         {doc.name}
                       </span>
@@ -352,14 +359,19 @@ export default function HomePage() {
                     className="block h-full mx-2"
                   >
                     <div className="flex flex-col items-center justify-center p-6 w-32 h-32 rounded-2xl bg-background border border-border/50 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all group cursor-pointer">
-                      <div className="relative w-12 h-12 mb-3 group-hover:scale-110 transition-transform duration-300">
-                        <Image
-                          src={doc.icon}
-                          alt={`${doc.name} icon`}
-                          fill
-                          className="object-contain"
-                        />
-                      </div>
+                      <div
+                        className="w-12 h-12 mb-3 group-hover:scale-110 transition-transform duration-300 bg-muted-foreground group-hover:bg-primary"
+                        style={{
+                          maskImage: `url(${doc.icon})`,
+                          maskSize: "contain",
+                          maskRepeat: "no-repeat",
+                          maskPosition: "center",
+                          WebkitMaskImage: `url(${doc.icon})`,
+                          WebkitMaskSize: "contain",
+                          WebkitMaskRepeat: "no-repeat",
+                          WebkitMaskPosition: "center",
+                        }}
+                      />
                       <span className="font-medium text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                         {doc.name}
                       </span>
@@ -856,13 +868,13 @@ export default function HomePage() {
             <p>&copy; 2025 DocsTalk. All rights reserved.</p>
             <div className="flex gap-8">
               <Link
-                href="#"
+                href="/privacy"
                 className="hover:text-foreground transition-colors"
               >
                 Privacy Policy
               </Link>
               <Link
-                href="#"
+                href="/terms"
                 className="hover:text-foreground transition-colors"
               >
                 Terms of Service

@@ -64,6 +64,25 @@ export async function registerAutoDetectRoutes(
           query,
           false
         );
+
+        // --- UPDATE CONVERSATION DOC_SOURCE ---
+        // Ensure the conversation icon reflects the current context
+        if (
+          decision.queryType === "specific" &&
+          decision.primarySource !== "general"
+        ) {
+          try {
+            await ragService.supabase
+              .from("conversations")
+              .update({ doc_source: decision.primarySource })
+              .eq("id", conversationId);
+          } catch (err) {
+            request.log.error(
+              { err, conversationId },
+              "Failed to update conversation doc_source"
+            );
+          }
+        }
       }
 
       // 3. Handle AMBIGUOUS -> Ask for Clarification

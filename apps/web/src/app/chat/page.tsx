@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -40,6 +41,8 @@ import {
   Code,
   FileCode,
   Server,
+  Zap,
+  Image as ImageIcon,
 } from "lucide-react";
 import { UserButton, useUser, SignInButton, useAuth } from "@clerk/nextjs";
 
@@ -405,8 +408,6 @@ export default function ChatPage() {
             console.log("State updated. ShowClarification should be true.");
             return;
 
-
-
           case "references":
             const references = event.data as Array<{
               title: string;
@@ -449,7 +450,7 @@ export default function ChatPage() {
       if (token && conversationId) {
         // Extract references from the last message state
         const finalReferences = assistantMessage.references;
-        
+
         const saveResult = await saveMessage(
           conversationId,
           "assistant",
@@ -546,11 +547,11 @@ export default function ChatPage() {
 
   const handleRegenerate = async () => {
     if (isStreaming) return;
-    
+
     // Find last assistant message index
     const lastMsgIndex = messages.length - 1;
     if (lastMsgIndex < 0) return;
-    
+
     const lastMsg = messages[lastMsgIndex];
     if (lastMsg.role !== "assistant") return;
 
@@ -620,7 +621,7 @@ export default function ChatPage() {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center gap-3">
                 <div className="relative w-8 h-8">
                   <AnimatedLogo variant="header" className="w-full h-full" />
                 </div>
@@ -632,7 +633,7 @@ export default function ChatPage() {
                     Smart Documentation Assistant
                   </p>
                 </div>
-              </div>
+              </Link>
             </div>
 
             <div className="flex items-center gap-3">
@@ -679,72 +680,85 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-8 scroll-smooth">
           <div className="max-w-4xl mx-auto">
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-                <div className="relative mb-8 group">
-                  <div className="absolute inset-0 bg-linear-to-r from-indigo-500 to-purple-600 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500" />
-                  <div className="relative bg-background border border-border/50 p-6 rounded-3xl shadow-2xl shadow-indigo-500/10 w-24 h-24 flex items-center justify-center">
-                    <AnimatedLogo variant="loading" className="w-full h-full" />
-                  </div>
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                {/* Modern Minimal Welcome */}
+                <div className="mb-12 space-y-4">
+                  <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
+                    <span className="bg-linear-to-r from-blue-600 via-indigo-500 to-purple-600 bg-clip-text text-transparent">
+                      {user?.firstName
+                        ? `Halo, ${user.firstName}`
+                        : "Halo There"}
+                    </span>
+                  </h2>
+                  <p className="text-muted-foreground text-lg font-medium opacity-80">
+                    How can I help you today?
+                  </p>
                 </div>
 
-                <h2 className="text-3xl font-bold tracking-tight mb-3">
-                  <span className="bg-linear-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                    Smart Documentation Assistant
-                  </span>
-                </h2>
-                <p className="text-muted-foreground max-w-lg mb-10 text-lg leading-relaxed">
-                  Your intelligent companion for documentation.
-                  <br className="hidden sm:block" />
-                  <span className="text-sm opacity-70 block">
-                    Expanding soon to more platforms.
-                  </span>
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+                {/* Pill Suggestions */}
+                <div className="flex flex-wrap justify-center gap-3 w-full max-w-3xl">
                   {[
                     {
                       label: "Create Next.js app",
                       query: "How do I create a Next.js app?",
-                      icon: <Terminal className="w-5 h-5 text-blue-500" />,
+                      icon: <Terminal className="w-4 h-4" />,
+                      color: "text-blue-500",
                     },
                     {
                       label: "Explain React hooks",
                       query: "Explain React hooks",
-                      icon: <Code className="w-5 h-5 text-purple-500" />,
+                      icon: <Code className="w-4 h-4" />,
+                      color: "text-purple-500",
                     },
                     {
                       label: "TypeScript generics",
                       query: "What are TypeScript generics?",
-                      icon: <FileCode className="w-5 h-5 text-yellow-500" />,
+                      icon: <FileCode className="w-4 h-4" />,
+                      color: "text-yellow-500",
                     },
                     {
                       label: "Server Components",
                       query: "How to use Server Components?",
-                      icon: <Server className="w-5 h-5 text-green-500" />,
+                      icon: <Server className="w-4 h-4" />,
+                      color: "text-green-500",
+                    },
+                    {
+                      label: "Deploy to Docker",
+                      query: "How to create a Dockerfile?",
+                      icon: <Zap className="w-4 h-4" />,
+                      color: "text-cyan-500",
                     },
                   ].map((item, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSendMessage(item.query)}
                       disabled={isStreaming}
-                      className="group relative text-left p-4 rounded-xl border border-border/50 bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 overflow-hidden"
+                      className="group flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-secondary/20 hover:bg-secondary/40 border border-border/40 hover:border-primary/20 transition-all duration-300 hover:scale-105 active:scale-95"
                     >
-                      <div className="absolute inset-0 bg-linear-to-r from-primary/0 via-primary/5 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                      <div className="flex items-start gap-3 relative z-10">
-                        <div className="p-2 rounded-lg bg-background/50 border border-border/50 group-hover:border-primary/20 transition-colors">
-                          {item.icon}
-                        </div>
-                        <div>
-                          <span className="block text-sm font-medium text-foreground group-hover:text-primary transition-colors mb-1">
-                            {item.label}
-                          </span>
-                          <span className="block text-xs text-muted-foreground opacity-70">
-                            "{item.query}"
-                          </span>
-                        </div>
-                      </div>
+                      <span
+                        className={`opacity-70 group-hover:opacity-100 transition-opacity ${item.color}`}
+                      >
+                        {item.icon}
+                      </span>
+                      <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                        {item.label}
+                      </span>
                     </button>
                   ))}
+
+                  {/* Action Buttons (Generate Image, etc - as per user screenshot idea) */}
+                  <button
+                    disabled
+                    className="group flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-secondary/10 border border-dashed border-border/40 opacity-50 cursor-not-allowed"
+                    title="Coming Soon"
+                  >
+                    <span className="text-pink-500">
+                      <ImageIcon className="w-4 h-4" />
+                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Generate Image
+                    </span>
+                  </button>
                 </div>
               </div>
             ) : (
