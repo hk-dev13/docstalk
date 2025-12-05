@@ -42,7 +42,7 @@ export function ModeToggle() {
         <span className="sr-only">Toggle theme</span>
       </Button>
 
-      <div className="absolute right-0 top-full mt-2 w-32 origin-top-right rounded-xl border border-border/50 bg-popover p-1 shadow-lg shadow-black/5 opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:scale-100 group-hover:visible transition-all duration-200 z-50">
+      <div className="absolute right-0 top-full mt-2 w-32 origin-top-right rounded-xl border border-border/50 bg-popover/95 backdrop-blur-xl p-1 shadow-xl shadow-black/10 opacity-0 scale-95 invisible group-hover:opacity-100 group-hover:scale-100 group-hover:visible transition-all duration-200 z-50 before:absolute before:-top-4 before:left-0 before:w-full before:h-4 before:content-['']">
         <button
           onClick={() => setTheme("light")}
           className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
