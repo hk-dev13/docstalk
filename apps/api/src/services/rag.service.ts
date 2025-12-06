@@ -1,6 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { QdrantService } from "./qdrant.service.js";
+import {
+  OnlineSearchService,
+  onlineSearchService,
+} from "./online-search.service.js";
+import { AutoIndexService, autoIndexService } from "./auto-index.service.js";
 
 interface SearchResult {
   id: string;
@@ -31,6 +36,8 @@ export class RAGService {
   private client: GoogleGenAI;
   public supabase: SupabaseClient;
   private qdrant: QdrantService;
+  private onlineSearch: OnlineSearchService;
+  private autoIndex: AutoIndexService;
 
   constructor() {
     this.client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -39,6 +46,8 @@ export class RAGService {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
     this.qdrant = new QdrantService();
+    this.onlineSearch = onlineSearchService;
+    this.autoIndex = autoIndexService;
   }
 
   async initialize() {
@@ -548,6 +557,29 @@ Always reply in user language even if not configured.`,
 
     // Return top N quality chunks
     return qualityChunks.slice(0, limit);
+  }
+
+  /**
+   * Check if search results are low quality (should trigger online search)
+   * Used for self-learning RAG fallback
+   */
+  private isLowQuality(results: SearchResult[]): boolean {
+    // No results at all
+    if (results.length === 0) return true;
+
+    // Very few results
+    if (results.length < 2) return true;
+
+    // Check average similarity score
+    const avgSimilarity =
+      results.reduce((sum, r) => sum + r.similarity, 0) / results.length;
+    if (avgSimilarity < 0.5) return true;
+
+    // Check if top result has very short content
+    const topResult = results[0];
+    if (topResult.content.length < 100) return true;
+
+    return false;
   }
 
   /**
