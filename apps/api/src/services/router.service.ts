@@ -168,14 +168,28 @@ export class RouterService {
         query
       );
 
-      if (ecosystemResult.confidence > 80) {
+      if (
+        ecosystemResult.confidence > 80 &&
+        ecosystemResult.suggestedDocSources.length > 0
+      ) {
+        // Use actual doc sources from ecosystem mapping, NOT ecosystem ID
+        const docSources = ecosystemResult.suggestedDocSources;
+        const primaryDocSource = docSources[0]; // First doc source as primary
+        const additionalDocSources = docSources.slice(1); // Rest as additional
+
         return {
           queryType: "specific",
-          primarySource: ecosystemResult.ecosystem.id, // Or map to specific doc source if needed
+          primarySource: primaryDocSource, // Use actual doc source (e.g., "nextjs", "react")
+          additionalSources:
+            additionalDocSources.length > 0 ? additionalDocSources : undefined,
           confidence: ecosystemResult.confidence,
-          reasoning: `Ecosystem detected: ${ecosystemResult.ecosystem.name} (${ecosystemResult.reasoning})`,
+          reasoning: `Ecosystem detected: ${
+            ecosystemResult.ecosystem.name
+          } → Sources: [${docSources.join(", ")}] (${
+            ecosystemResult.reasoning
+          })`,
           needsClarification: false,
-          suggestedSources: ecosystemResult.suggestedDocSources,
+          suggestedSources: docSources,
         };
       }
 

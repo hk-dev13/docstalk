@@ -5,6 +5,48 @@ All notable changes to DocsTalk will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3-alpha] - 2025-12-06
+
+### 🐛 Critical Bug Fixes
+
+- **Router Logic Bug** - Ecosystem ID was sent to Qdrant instead of doc source ID
+  - Fixed: Queries now correctly search documentation chunks
+  - Example: "Next.js" query now searches `nextjs` chunks, not `frontend_web`
+  - Root cause: `primarySource` was set to `ecosystem.id` instead of `suggestedDocSources[0]`
+  - Result: RAG retrieval now works correctly with ecosystem-based routing
+
+### 🎨 Icon System Overhaul
+
+- **SVG Icon Migration** from emoji/Lucide icons to proper SVG files
+  - Created migration `007_update_icon_urls.sql`
+  - Updated `doc_ecosystems.icon` and `doc_sources.icon_url` columns
+  - All 8 ecosystems now use SVG icon paths
+
+### 🔧 Frontend Updates
+
+- **Routing Indicator Sync** with database ecosystem structure
+  - Added individual icons for all doc sources (React, Next.js, TypeScript, etc.)
+  - Fixed icon path mismatches (express-js, vue-js, rust-programming-language, etc.)
+  - Improved multi-source search display with `additionalSources`
+
+---
+
+## [0.3.2-alpha] - 2025-12-06
+
+### ✨ Added
+
+- **Settings Page** (`/settings`) with profile overview and theme toggle
+- **Sonner Toast Notifications** for copy feedback, errors, and actions
+- **Redesigned Empty Chat State** with modern pill layout
+
+### 💅 Improved
+
+- Enhanced SEO with dynamic metadata templates
+- Mobile responsiveness for sidebar gestures
+- Instant feedback for feedback submission and share actions
+
+---
+
 ## [0.3.1-alpha] - 2025-12-02
 
 ### 🔒 Security

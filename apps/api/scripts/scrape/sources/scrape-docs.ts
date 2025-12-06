@@ -25,7 +25,7 @@ const DOC_CONFIGS = {
     baseUrl: "https://nextjs.org",
     startUrls: ["https://nextjs.org/docs", "https://nextjs.org/blog"],
     urlPattern: /^https:\/\/nextjs\.org\/(docs|blog)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   react: {
     name: "React",
@@ -36,7 +36,7 @@ const DOC_CONFIGS = {
       "https://react.dev/blog",
     ],
     urlPattern: /^https:\/\/react\.dev\/(learn|reference|blog)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   typescript: {
     name: "TypeScript",
@@ -46,7 +46,7 @@ const DOC_CONFIGS = {
       "https://www.typescriptlang.org/docs/handbook/release-notes/overview.html",
     ],
     urlPattern: /^https:\/\/www\.typescriptlang\.org\/docs/,
-    maxPages: 250,
+    maxPages: 500,
   },
   nodejs: {
     name: "Node.js",
@@ -56,28 +56,28 @@ const DOC_CONFIGS = {
       "https://nodejs.org/en/blog/release/",
     ],
     urlPattern: /^https:\/\/nodejs\.org\/(docs\/latest\/api|en\/blog\/release)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   tailwind: {
     name: "Tailwind CSS",
     baseUrl: "https://tailwindcss.com",
     startUrls: ["https://tailwindcss.com/docs", "https://tailwindcss.com/blog"],
     urlPattern: /^https:\/\/tailwindcss\.com\/(docs|blog)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   prisma: {
     name: "Prisma",
     baseUrl: "https://www.prisma.io",
     startUrls: ["https://www.prisma.io/docs", "https://www.prisma.io/blog"],
     urlPattern: /^https:\/\/www\.prisma\.io\/(docs|blog)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   express: {
     name: "Express",
     baseUrl: "https://expressjs.com",
     startUrls: ["https://expressjs.com/en/starter/installing.html"],
     urlPattern: /^https:\/\/expressjs\.com\/en/,
-    maxPages: 100,
+    maxPages: 500,
   },
   python: {
     name: "Python",
@@ -87,7 +87,7 @@ const DOC_CONFIGS = {
       "https://docs.python.org/3/whatsnew/index.html",
     ],
     urlPattern: /^https:\/\/docs\.python\.org\/3\/(tutorial|whatsnew|library)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   rust: {
     name: "Rust",
@@ -97,14 +97,14 @@ const DOC_CONFIGS = {
       "https://doc.rust-lang.org/edition-guide/",
     ],
     urlPattern: /^https:\/\/doc\.rust-lang\.org\/(book|edition-guide)/,
-    maxPages: 250,
+    maxPages: 500,
   },
   go: {
     name: "Go",
     baseUrl: "https://go.dev",
     startUrls: ["https://go.dev/doc/", "https://go.dev/doc/devel/release"],
     urlPattern: /^https:\/\/go\.dev\/doc/,
-    maxPages: 250,
+    maxPages: 500,
   },
   docker: {
     name: "Docker",
@@ -117,7 +117,7 @@ const DOC_CONFIGS = {
     ],
     urlPattern:
       /^https:\/\/docs\.docker\.com\/(get-started|guides|reference|engine|compose|build|desktop)/,
-    maxPages: 200,
+    maxPages: 500,
   },
   fastapi: {
     name: "FastAPI",
@@ -129,7 +129,7 @@ const DOC_CONFIGS = {
     ],
     urlPattern:
       /^https:\/\/fastapi\.tiangolo\.com\/(tutorial|advanced|deployment|reference|release-notes)/,
-    maxPages: 200,
+    maxPages: 500,
   },
   vue: {
     name: "Vue.js",
@@ -140,7 +140,7 @@ const DOC_CONFIGS = {
       "https://vuejs.org/about/blog.html",
     ],
     urlPattern: /^https:\/\/vuejs\.org\/(guide|api|about)/,
-    maxPages: 200,
+    maxPages: 500,
   },
   postgresql: {
     name: "PostgreSQL",
@@ -150,7 +150,7 @@ const DOC_CONFIGS = {
       "https://www.postgresql.org/docs/release/",
     ],
     urlPattern: /^https:\/\/www\.postgresql\.org\/docs\/(current|release)/,
-    maxPages: 200,
+    maxPages: 500,
   },
 };
 

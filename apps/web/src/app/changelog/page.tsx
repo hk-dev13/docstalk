@@ -8,6 +8,21 @@ import { Calendar, Tag, GitCommit } from "lucide-react";
 export default function ChangelogPage() {
   const changes = [
     {
+      version: "v0.3.3-alpha",
+      date: "December 6, 2025",
+      title: "Critical Router Fix & Icon System Update",
+      type: "major",
+      items: [
+        "Fixed critical router bug: Ecosystem ID was sent to Qdrant instead of doc source ID",
+        "Now queries correctly search documentation (e.g., 'Next.js' → searches 'nextjs' chunks, not 'frontend_web')",
+        "Updated routing-indicator.tsx mappings to sync with database ecosystem structure",
+        "Added individual SVG icons for all doc sources (React, Next.js, TypeScript, etc.)",
+        "Created migration 007_update_icon_urls.sql to replace emoji/Lucide icons with SVG paths",
+        "Fixed icon file path mismatches (express-js, vue-js, rust-programming-language, etc.)",
+        "Improved multi-source search with additionalSources from ecosystem mapping",
+      ],
+    },
+    {
       version: "v0.3.2-alpha",
       date: "December 6, 2025",
       title: "Settings Page & UI Polish",

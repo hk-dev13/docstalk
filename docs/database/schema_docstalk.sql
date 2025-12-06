@@ -1,6 +1,16 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.chat_feedback (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  message_id uuid,
+  user_id text,
+  feedback_type text NOT NULL CHECK (feedback_type = ANY (ARRAY['up'::text, 'down'::text])),
+  reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT chat_feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT chat_feedback_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.messages(id)
+);
 CREATE TABLE public.context_switches (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   conversation_id uuid NOT NULL,
@@ -128,15 +138,4 @@ CREATE TABLE public.users (
   created_at timestamp without time zone DEFAULT now(),
   updated_at timestamp without time zone DEFAULT now(),
   CONSTRAINT users_pkey PRIMARY KEY (id)
-);
-
-CREATE TABLE public.chat_feedback (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  message_id uuid,
-  user_id text,
-  feedback_type text NOT NULL CHECK (feedback_type IN ('up', 'down')),
-  reason text,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT chat_feedback_pkey PRIMARY KEY (id),
-  CONSTRAINT chat_feedback_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE CASCADE
 );

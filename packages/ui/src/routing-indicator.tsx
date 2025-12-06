@@ -28,83 +28,82 @@ export function RoutingIndicator({
   // Normalisasi source
   const s = detectedSource.toLowerCase();
 
-  // Mappings from specific source to Category
+  // Mappings from specific doc source to ecosystem (synced with database)
+  // Based on: docs/database/ecosystem-mapping-guide.md
   const mappings: Record<string, string> = {
-    // Frontend
-    react: "frontend",
-    nextjs: "frontend",
-    vue: "frontend",
-    typescript: "frontend",
-    javascript: "frontend",
+    // Frontend Web Ecosystem (frontend_web)
+    react: "frontend_web",
+    nextjs: "frontend_web",
+    typescript: "frontend_web",
+    vue: "frontend_web", // Planned
 
-    // Backend
-    nodejs: "backend",
-    express: "backend",
-    fastapi: "backend",
-    go: "backend",
-    rust: "backend",
+    // JS Backend Ecosystem (js_backend)
+    nodejs: "js_backend",
+    express: "js_backend",
 
-    // Database
-    postgresql: "database",
-    mysql: "database",
-    mongodb: "database",
+    // Python Ecosystem (python)
+    python: "python",
+    fastapi: "python", // Planned
+
+    // Systems Programming Ecosystem (systems)
+    rust: "systems",
+    go: "systems",
+
+    // Database & ORM Ecosystem (database)
     prisma: "database",
-    supabase: "database",
+    postgresql: "database", // Mapped but may not have chunks yet
 
-    // Cloud
-    docker: "cloud_infra",
-    kubernetes: "cloud_infra",
-    aws: "cloud_infra",
-
-    // Styling
+    // Styling & UI Ecosystem (styling)
     tailwind: "styling",
-    css: "styling",
 
-    // AI/ML
-    gemini: "ai_ml",
-    openai: "ai_ml",
+    // Cloud & Infrastructure Ecosystem (cloud_infra)
+    docker: "cloud_infra", // Planned
 
-    // Direct matches
-    frontend: "frontend",
-    backend: "backend",
-    fullstack: "fullstack",
-    systems: "systems",
-    cloud_infra: "cloud_infra",
+    // AI & ML Ecosystem (ai_ml)
+    meta: "ai_ml", // DocsTalk platform queries
+
+    // Special
+    general: "general",
+    docstalk: "meta",
+
+    // Direct ecosystem ID matches (when ecosystem ID is passed directly)
+    frontend_web: "frontend_web",
+    js_backend: "js_backend",
     ai_ml: "ai_ml",
+    cloud_infra: "cloud_infra",
     database: "database",
     styling: "styling",
-    general: "general",
-    meta: "meta",
+    systems: "systems",
   };
 
-  // Icon definitions (Path + Display Label + Color)
+  // Ecosystem category config (for fallback display)
   const categoryConfig: Record<
     string,
     { icon: string; label: string; color: string }
   > = {
-    frontend: {
+    frontend_web: {
       icon: "/assets/support_docs/frontend.svg",
-      label: "Frontend",
+      label: "Frontend Web",
       color: "bg-blue-500",
     },
-    backend: {
+    js_backend: {
       icon: "/assets/support_docs/backend.svg",
-      label: "Backend",
+      label: "JS Backend",
       color: "bg-green-500",
     },
-    fullstack: {
-      icon: "/assets/support_docs/fullstack.svg",
-      label: "Fullstack",
-      color: "bg-indigo-500",
+    python: {
+      icon: "/assets/support_docs/icons8-python.svg",
+      label: "Python",
+      color: "bg-yellow-500",
     },
     systems: {
       icon: "/assets/support_docs/systems.svg",
       label: "Systems",
-      color: "bg-red-500",
+      color: "bg-orange-500",
     },
     cloud_infra: {
       icon: "/assets/support_docs/cloud_infra.svg",
-      label: "Cloud Infra",
+      label: "Cloud & Infra",
       color: "bg-purple-500",
     },
     ai_ml: {
@@ -134,15 +133,105 @@ export function RoutingIndicator({
     },
   };
 
-  // Specific overrides if needed (e.g. Python has its own icon)
+  // Specific doc source overrides (individual source icons for better UX)
   const specificConfig: Record<
     string,
     { icon: string; label: string; color: string }
   > = {
+    // Frontend Web sources
+    react: {
+      icon: "/assets/support_docs/icons8-react.svg",
+      label: "React",
+      color: "bg-cyan-400",
+    },
+    nextjs: {
+      icon: "/assets/support_docs/icons8-nextjs.svg",
+      label: "Next.js",
+      color: "bg-black dark:bg-white",
+    },
+    typescript: {
+      icon: "/assets/support_docs/icons8-typescript.svg",
+      label: "TypeScript",
+      color: "bg-blue-600",
+    },
+    vue: {
+      icon: "/assets/support_docs/icons8-vue-js.svg",
+      label: "Vue.js",
+      color: "bg-emerald-500",
+    },
+
+    // JS Backend sources
+    nodejs: {
+      icon: "/assets/support_docs/icons8-nodejs.svg",
+      label: "Node.js",
+      color: "bg-green-600",
+    },
+    express: {
+      icon: "/assets/support_docs/icons8-express-js.svg",
+      label: "Express",
+      color: "bg-gray-600",
+    },
+
+    // Python sources
     python: {
       icon: "/assets/support_docs/icons8-python.svg",
       label: "Python",
       color: "bg-yellow-500",
+    },
+    fastapi: {
+      icon: "/assets/support_docs/icons8-fastapi.svg",
+      label: "FastAPI",
+      color: "bg-teal-500",
+    },
+
+    // Systems sources
+    rust: {
+      icon: "/assets/support_docs/icons8-rust-programming-language.svg",
+      label: "Rust",
+      color: "bg-orange-600",
+    },
+    go: {
+      icon: "/assets/support_docs/icons8-go.svg",
+      label: "Go",
+      color: "bg-cyan-500",
+    },
+
+    // Database sources
+    prisma: {
+      icon: "/assets/support_docs/icons8-prisma-orm.svg",
+      label: "Prisma",
+      color: "bg-indigo-500",
+    },
+    postgresql: {
+      icon: "/assets/support_docs/icons8-postgresql.svg",
+      label: "PostgreSQL",
+      color: "bg-blue-700",
+    },
+
+    // Styling sources
+    tailwind: {
+      icon: "/assets/support_docs/icons8-tailwind-css.svg",
+      label: "Tailwind CSS",
+      color: "bg-sky-500",
+    },
+
+    // Cloud sources
+    docker: {
+      icon: "/assets/support_docs/icons8-docker.svg",
+      label: "Docker",
+      color: "bg-blue-500",
+    },
+
+    // Meta/DocsTalk
+    meta: {
+      icon: "/assets/logo/logo_docstalk.svg",
+      label: "DocsTalk",
+      color: "bg-primary",
+    },
+    docstalk: {
+      icon: "/assets/logo/logo_docstalk.svg",
+      label: "DocsTalk",
+      color: "bg-primary",
     },
   };
 
