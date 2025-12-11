@@ -438,6 +438,41 @@ export default function ChatPage() {
             ]);
             break;
 
+          case "status":
+            // Self-learning RAG: Status update (e.g., "Searching online...")
+            const statusText = (event.data as { text: string }).text;
+            setMessages((prev) => [
+              ...prev.slice(0, -1),
+              {
+                ...assistantMessage,
+                content: fullResponse || `🔍 ${statusText}`,
+                isSearchingOnline: true,
+              },
+            ]);
+            break;
+
+          case "source_discovered":
+            // Self-learning RAG: New source was found and indexed
+            const discoveredData = event.data as {
+              url: string;
+              isNew: boolean;
+            };
+            if (discoveredData.isNew) {
+              toast.success(
+                "✨ New documentation discovered and indexed for future questions!",
+                { duration: 4000 }
+              );
+            }
+            setMessages((prev) => [
+              ...prev.slice(0, -1),
+              {
+                ...assistantMessage,
+                content: fullResponse,
+                discoveredSource: discoveredData,
+              },
+            ]);
+            break;
+
           case "done":
             // Streaming complete
             break;
