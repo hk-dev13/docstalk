@@ -203,16 +203,16 @@ export function ChatMessage({
 
         {/* Bubble */}
         <div
-          className={`relative px-5 py-3.5 rounded-2xl shadow-sm ${
+          className={`relative px-5 py-3.5 rounded-2xl shadow-sm overflow-hidden ${
             isThinking
-              ? "bg-transparent border-none shadow-none p-0"
+              ? "bg-transparent border-none shadow-none p-0 overflow-visible"
               : isUser
               ? "bg-linear-to-br from-indigo-600 to-blue-600 text-white rounded-tr-sm shadow-indigo-500/10"
               : "bg-card border border-border/50 text-foreground rounded-tl-sm"
           }`}
         >
           {role === "assistant" ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent">
+          <div className="prose prose-sm dark:prose-invert max-w-full overflow-x-auto prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent break-words">
               {/* Thinking Indicator (Streaming) */}
               {isThinking && (
                 <div className="flex items-center gap-2.5 py-1 animate-pulse">
