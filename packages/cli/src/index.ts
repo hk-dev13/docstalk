@@ -132,9 +132,7 @@ function showBanner() {
 ║   ██████╔╝╚██████╔╝╚██████╗███████║   ██║   ██║  ██║███████╗ ██║  ██╗
 ║   ╚═════╝  ╚═════╝  ╚═════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═╝  ╚═╝
 ║                                                                ║
-║   ${chalk.white.bold(
-      "Smart Documentation Assistant"
-    )}                      ║
+║   ${chalk.white.bold("Smart Documentation Assistant")}                      ║
 ║   ${chalk.gray(
       "Ask questions, get instant answers from official docs"
     )}         ║
@@ -144,15 +142,13 @@ function showBanner() {
   );
   console.log(
     chalk.gray(
-      `   Version: ${chalk.green("v0.3.6-alpha")}  |  Mode: ${
+      `   Version: ${chalk.green("v0.3.7-alpha")}  |  Mode: ${
         isDev ? chalk.yellow("Development") : chalk.green("Production")
       }`
     )
   );
   console.log(
-    chalk.gray(
-      `   Docs: ${chalk.blue("https://docstalk.envoyou.com")}\n`
-    )
+    chalk.gray(`   Docs: ${chalk.blue("https://docstalk.envoyou.com")}\n`)
   );
 }
 
@@ -195,6 +191,9 @@ function showHelp() {
     chalk.gray("    docstalk dev index           Index documentation")
   );
   console.log(
+    chalk.gray("    docstalk dev index --url     Index specific URL only")
+  );
+  console.log(
     chalk.gray("    docstalk dev test-router     Test routing logic\n")
   );
 
@@ -202,12 +201,11 @@ function showHelp() {
   console.log(chalk.gray('  $ docstalk ask "how to use hooks"'));
   console.log(chalk.gray('  $ docstalk ask "docker compose" --source docker'));
   console.log(chalk.gray("  $ docstalk login eyJhbGciOi..."));
-  console.log(chalk.gray("  $ docstalk dev scrape react --incremental\n"));
+  console.log(chalk.gray("  $ docstalk dev scrape react --incremental"));
+  console.log(chalk.gray("  $ docstalk dev index nextjs --url https://nextjs.org/docs/new-feature\n"));
 
   console.log(chalk.white.bold("🔗 More Info:\n"));
-  console.log(
-    chalk.gray("  Documentation: https://docstalk.envoyou.com")
-  );
+  console.log(chalk.gray("  Documentation: https://docstalk.envoyou.com"));
   console.log(
     chalk.gray("  Report Issues: https://github.com/hk-dev13/docstalk/issues\n")
   );
@@ -222,7 +220,7 @@ const program = new Command();
 program
   .name("docstalk")
   .description("AI-powered documentation assistant")
-  .version("0.3.6-alpha", "-v, --version", "Show version");
+  .version("0.3.7-alpha", "-v, --version", "Show version");
 
 // ============================================================================
 // CONFIG COMMANDS
@@ -582,7 +580,10 @@ devCommand
   .command("index")
   .description("Index documentation for RAG")
   .argument("<source>", "Source to index (e.g., nextjs, react)")
-  .action(async (source) => {
+  .option("--incremental", "Only index new/changed chunks (skip unchanged)")
+  .option("--partial", "Partial index mode (merge with existing vectors)")
+  .option("--url <url>", "Index specific URL only (surgical update)")
+  .action(async (source, options) => {
     requireDevPermission("dev index");
 
     if (!projectRoot) {
@@ -594,9 +595,36 @@ devCommand
       process.exit(1);
     }
 
-    console.log(chalk.blue(`📊 Indexing ${source}...`));
+    const mode = options.url
+      ? "url"
+      : options.incremental
+      ? "incremental"
+      : options.partial
+      ? "partial"
+      : "full";
+
+    console.log(
+      chalk.blue(
+        `📊 Indexing ${source}${mode !== "full" ? ` (${mode} mode)` : ""}${
+          options.url ? `: ${options.url}` : ""
+        }`
+      )
+    );
+
     try {
-      await execa("pnpm", ["--filter", "@docstalk/api", "index", source], {
+      const args = ["--filter", "@docstalk/api", "index", source];
+
+      if (options.incremental) {
+        args.push("--incremental");
+      }
+      if (options.partial) {
+        args.push("--partial");
+      }
+      if (options.url) {
+        args.push("--url", options.url);
+      }
+
+      await execa("pnpm", args, {
         cwd: projectRoot,
         stdio: "inherit",
       });
