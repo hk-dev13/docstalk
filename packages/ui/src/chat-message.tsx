@@ -180,8 +180,8 @@ export function ChatMessage({
       )}
 
       <div
-        className={`flex gap-4 max-w-[85%] ${
-          isUser ? "flex-row-reverse" : "flex-row"
+        className={`flex gap-4 ${
+          isUser ? "max-w-[70%] flex-row-reverse" : "max-w-[80%] flex-row"
         }`}
       >
         {/* Avatar */}
