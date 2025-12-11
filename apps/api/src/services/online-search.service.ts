@@ -203,34 +203,60 @@ export class OnlineSearchService {
     }
 
     try {
-      const searchQuery = this.buildSiteQuery(query, ecosystemHint);
-      const apiUrl = new URL("https://www.googleapis.com/customsearch/v1");
-      apiUrl.searchParams.set("key", this.CSE_API_KEY);
-      apiUrl.searchParams.set("cx", this.CSE_ENGINE_ID);
-      apiUrl.searchParams.set("q", searchQuery);
-      apiUrl.searchParams.set("num", String(Math.min(limit * 2, 10))); // Fetch extra for ranking
-
-      console.log(`[OnlineSearch] Searching: ${query}`);
-
-      const response = await fetch(apiUrl.toString());
-      if (!response.ok) {
-        console.error(`[OnlineSearch] API error: ${response.status}`);
-        return [];
-      }
-
-      const data = (await response.json()) as { items?: RawGoogleResult[] };
-      const items: RawGoogleResult[] = data.items || [];
-
-      // Filter to only allowed domains and rank results
-      const filteredResults = items.filter((item) =>
-        this.isAllowedDomain(item.link)
+      // First try with ecosystem-specific domains
+      let searchQuery = this.buildSiteQuery(query, ecosystemHint);
+      console.log(
+        `[OnlineSearch] Searching: ${query} (ecosystem: ${
+          ecosystemHint || "all"
+        })`
       );
 
-      return this.rankResults(filteredResults, query).slice(0, limit);
+      let results = await this.executeSearch(searchQuery, limit);
+
+      // If no results with ecosystem hint, fallback to ALL domains
+      if (results.length === 0 && ecosystemHint) {
+        console.log(
+          `[OnlineSearch] No results for ${ecosystemHint}, trying all domains...`
+        );
+        searchQuery = this.buildSiteQuery(query, undefined); // Search all domains
+        results = await this.executeSearch(searchQuery, limit);
+      }
+
+      return results;
     } catch (error) {
       console.error("[OnlineSearch] Search failed:", error);
       return [];
     }
+  }
+
+  /**
+   * Execute the actual Google CSE search
+   */
+  private async executeSearch(
+    searchQuery: string,
+    limit: number
+  ): Promise<OnlineSearchResult[]> {
+    const apiUrl = new URL("https://www.googleapis.com/customsearch/v1");
+    apiUrl.searchParams.set("key", this.CSE_API_KEY);
+    apiUrl.searchParams.set("cx", this.CSE_ENGINE_ID);
+    apiUrl.searchParams.set("q", searchQuery);
+    apiUrl.searchParams.set("num", String(Math.min(limit * 2, 10)));
+
+    const response = await fetch(apiUrl.toString());
+    if (!response.ok) {
+      console.error(`[OnlineSearch] API error: ${response.status}`);
+      return [];
+    }
+
+    const data = (await response.json()) as { items?: RawGoogleResult[] };
+    const items: RawGoogleResult[] = data.items || [];
+
+    // Filter to only allowed domains and rank results
+    const filteredResults = items.filter((item) =>
+      this.isAllowedDomain(item.link)
+    );
+
+    return this.rankResults(filteredResults, searchQuery).slice(0, limit);
   }
 
   /**

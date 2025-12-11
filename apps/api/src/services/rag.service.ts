@@ -821,11 +821,15 @@ Give your answer now based on the instructions above.
     let discoveredUrl: string | null = null;
 
     // 3. SELF-LEARNING RAG: Online search fallback
-    //    Trigger when: (Premium + LowQuality results) OR (forceOnlineSearch toggle)
-    const isPremium = options?.isPremium ?? false;
+    //    Trigger when:
+    //    - forceOnlineSearch toggle is ON (user explicitly requested)
+    //    - OR results are low quality (empty, short, or low relevance)
+    //    - OR top result has low similarity (below 0.75 threshold)
     const forceOnlineSearch = options?.forceOnlineSearch ?? false;
+    const hasLowRelevance =
+      searchResults.length > 0 && searchResults[0].similarity < 0.75;
     const shouldSearchOnline =
-      (isPremium && this.isLowQuality(searchResults)) || forceOnlineSearch;
+      forceOnlineSearch || this.isLowQuality(searchResults) || hasLowRelevance;
 
     if (shouldSearchOnline && this.onlineSearch.isEnabled()) {
       // Notify frontend we're searching online
@@ -963,7 +967,15 @@ ${context || "No specific documentation found for this query."}
    - **Step A:** Check if the "Available Documentation Context" contains the answer to the User Question.
    - **Step B (Strict RAG):** IF the context is relevant, use it to answer and cite the [URL] at the end.
    - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** (e.g., user asks about 'VPS' but context is 'venv') OR **empty**, explicitly IGNORE the context constraints.
-     - Instead, answer the question using your **General Expert Knowledge** to be helpful.
+     - **CRITICAL TIME & VERSION TRUST:**
+       - If the user mentions a specific date (e.g., "November 2025") or a software version (e.g., "Redis 8.4", "Next.js 16") that is newer than your internal knowledge, **TRUST THE USER**.
+       - Assume your internal training data is outdated. DO NOT correct the user's timeline or version claims.
+       - The current date is: ${new Date().toLocaleDateString("en-US", {
+         month: "long",
+         day: "numeric",
+         year: "numeric",
+       })}.
+     - Answer using your **General Expert Knowledge** combined with the user's provided facts.
      - If answering from General Knowledge, explicitly state at the end: "*(Answered using general knowledge)*".
 
 **3. FORMATTING:**
@@ -1155,7 +1167,8 @@ ${context || "No specific documentation found for this query."}
    - **Step A:** Check if the "Available Documentation Context" contains the answer.
    - **Step B (Strict RAG):** IF relevant, use the docs and cite URLs.
    - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** or **empty**, IGNORE the context constraints.
-     - Answer using your **General Expert Knowledge**.
+     - **CRITICAL:** If user mentions newer dates/versions than your training data, **TRUST THE USER**. Do not contradict their timeline.
+     - Answer using your **General Expert Knowledge** combined with the user's facts.
      - Explicitly state at the end: "*(Answered using general knowledge)*".
 
 **3. FORMATTING:**
@@ -1274,7 +1287,8 @@ ${context || "No specific documentation found across the requested sources."}
      - Clearly indicate which source a piece of info comes from (e.g., "According to React docs...", "In Tailwind...").
      - Cite URLs at the end.
    - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** or **empty**, IGNORE the context constraints.
-     - Answer using your **General Expert Knowledge**.
+     - **CRITICAL:** If user mentions newer dates/versions than your training data, **TRUST THE USER**. Do not contradict their timeline.
+     - Answer using your **General Expert Knowledge** combined with the user's facts.
      - Explicitly state at the end: "*(Answered using general knowledge)*".
 
 **3. FORMATTING:**
@@ -1391,7 +1405,8 @@ ${context || "No specific documentation found across the requested sources."}
      - Clearly indicate which source a piece of info comes from (e.g., "According to React docs...", "In Tailwind...").
      - Cite URLs at the end.
    - **Step C (General Knowledge Fallback):** IF the context is **irrelevant** or **empty**, IGNORE the context constraints.
-     - Answer using your **General Expert Knowledge**.
+     - **CRITICAL:** If user mentions newer dates/versions than your training data, **TRUST THE USER**. Do not contradict their timeline.
+     - Answer using your **General Expert Knowledge** combined with the user's facts.
      - Explicitly state at the end: "*(Answered using general knowledge)*".
 
 **3. FORMATTING:**
