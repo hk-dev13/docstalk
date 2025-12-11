@@ -212,7 +212,7 @@ export function ChatMessage({
           }`}
         >
           {role === "assistant" ? (
-          <div className="prose prose-sm dark:prose-invert max-w-full overflow-x-auto prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent break-words">
+          <div className="prose prose-sm dark:prose-invert max-w-full overflow-x-auto prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent wrap-break-words">
               {/* Thinking Indicator (Streaming) */}
               {isThinking && (
                 <div className="flex items-center gap-2.5 py-1 animate-pulse">
