@@ -8,6 +8,21 @@ import { Calendar, Tag, GitCommit } from "lucide-react";
 export default function ChangelogPage() {
   const changes = [
     {
+      version: "v0.3.4-alpha",
+      date: "December 11, 2025",
+      title: "Smarter RAG & Online Search Toggle",
+      type: "major",
+      items: [
+        "Improved query reformulation for time-sensitive queries (versi terbaru, latest version)",
+        "Added entity extraction from conversation history for better context retention",
+        "Fixed filterQualityChunks to not reject version/release content",
+        "Added incremental indexing (--partial, --url flags) for surgical updates",
+        "New Online Search toggle button (🌐 Web) in chat input",
+        "Force real-time web search when toggle is enabled",
+        "Self-learning RAG: Auto-index discovered documentation",
+      ],
+    },
+    {
       version: "v0.3.3-alpha",
       date: "December 6, 2025",
       title: "Critical Router Fix & Icon System Update",
