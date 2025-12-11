@@ -37,22 +37,49 @@ export class OnlineSearchService {
 
   // Domain whitelist (conservative scope - only domains we support)
   private ALLOWED_DOMAINS: Record<string, string> = {
+    // Frontend
     "nextjs.org": "nextjs",
     "react.dev": "react",
     "vuejs.org": "vue",
+    "angular.dev": "angular",
+    "angular.io": "angular",
+    "svelte.dev": "svelte",
     "tailwindcss.com": "tailwind",
+
+    // Backend/Runtime
     "nodejs.org": "nodejs",
     "expressjs.com": "express",
     "fastapi.tiangolo.com": "fastapi",
     "go.dev": "go",
     "doc.rust-lang.org": "rust",
     "www.rust-lang.org": "rust",
+    "docs.python.org": "python",
+
+    // Database/ORM
     "prisma.io": "prisma",
     "www.prisma.io": "prisma",
-    "docs.docker.com": "docker",
     "www.postgresql.org": "postgresql",
+    "www.mongodb.com": "mongodb",
+    "docs.mongodb.com": "mongodb",
+    "redis.io": "redis",
+
+    // DevOps/Cloud
+    "docs.docker.com": "docker",
+    "kubernetes.io": "kubernetes",
+
+    // Cloud Providers
+    "cloud.google.com": "gcp",
+    "firebase.google.com": "firebase",
+    "docs.aws.amazon.com": "aws",
+    "learn.microsoft.com": "azure",
+    "docs.microsoft.com": "azure",
+
+    // Languages
     "typescriptlang.org": "typescript",
     "www.typescriptlang.org": "typescript",
+
+    // General Web
+    "developer.mozilla.org": "mdn",
   };
 
   // Google CSE config
