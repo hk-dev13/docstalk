@@ -302,11 +302,35 @@ async function loadChunks(source: string): Promise<DocChunk[]> {
  * Main indexing function
  */
 async function main() {
-  const source = process.argv[2];
+  const args = process.argv.slice(2);
+  const source = args[0];
+
+  // Parse flags
+  const flags = {
+    partial: args.includes("--partial"),
+    url: args.find((arg) => arg.startsWith("--url="))?.split("=")[1],
+  };
 
   if (!source) {
-    console.error("Usage: pnpm index <source>");
+    console.error("Usage: pnpm index <source> [flags]");
     console.error("Example: pnpm index nextjs");
+    console.error("");
+    console.error("Flags:");
+    console.error(
+      "  --partial          Only index new/changed chunks (no delete of existing)"
+    );
+    console.error(
+      "  --url=<url>        Only index chunks for specific URL (use after partial scrape)"
+    );
+    console.error("");
+    console.error("Examples:");
+    console.error("  pnpm index react                 # Full reindex");
+    console.error(
+      "  pnpm index react --partial       # Index without deleting existing"
+    );
+    console.error(
+      "  pnpm index react --url=https://react.dev/hooks/useState  # Index single URL only"
+    );
     process.exit(1);
   }
 
@@ -328,13 +352,187 @@ async function main() {
   console.log(`\n🚀 DocsTalk Documentation Indexer\n`);
 
   // Load chunks
-  const chunks = await loadChunks(source);
-  console.log(`📂 Loaded ${chunks.length} chunks for ${source}`);
+  const allChunks = await loadChunks(source);
+  console.log(`📂 Loaded ${allChunks.length} chunks for ${source}`);
 
-  // Index chunks
-  await indexChunks(source, chunks);
+  // Filter chunks if --url flag is provided
+  let chunksToIndex = allChunks;
+  if (flags.url) {
+    chunksToIndex = allChunks.filter((chunk) => chunk.url === flags.url);
+    console.log(`🎯 Filtering to URL: ${flags.url}`);
+    console.log(`   Found ${chunksToIndex.length} chunks for this URL`);
+
+    if (chunksToIndex.length === 0) {
+      console.error(`\n❌ No chunks found for URL: ${flags.url}`);
+      console.error(`   Make sure you ran: pnpm scrape ${flags.url} --partial`);
+      process.exit(1);
+    }
+  }
+
+  // Index chunks (partial or full)
+  if (flags.partial || flags.url) {
+    console.log(`\n⚡ Partial mode: Only indexing new/changed chunks`);
+    await indexChunksPartial(source, chunksToIndex);
+  } else {
+    // Full reindex (deletes existing)
+    await indexChunks(source, chunksToIndex);
+  }
 
   console.log(`\n✅ Done! ${source} is now searchable.\n`);
+}
+
+/**
+ * Index chunks without deleting existing (partial/incremental mode)
+ */
+async function indexChunksPartial(source: string, chunks: DocChunk[]) {
+  console.log(
+    `\n📊 Partial indexing ${chunks.length} chunks for ${source}...\n`
+  );
+
+  // Initialize Qdrant
+  const qdrant = new QdrantService();
+  await qdrant.ensureCollection();
+
+  // Get unique URLs to clean up only those
+  const urlsToUpdate = [...new Set(chunks.map((c) => c.url))];
+  console.log(`  🎯 Updating ${urlsToUpdate.length} URL(s)`);
+
+  // Delete only chunks for the specific URLs being updated
+  for (const url of urlsToUpdate) {
+    console.log(`  🧹 Cleaning up existing chunks for: ${url}`);
+    try {
+      // Delete from Supabase by URL
+      const { error } = await supabase
+        .from("doc_chunk_meta")
+        .delete()
+        .eq("source", source)
+        .eq("url", url);
+
+      if (error) throw error;
+
+      // Note: Qdrant doesn't support filtering by URL in delete
+      // The upsert with same ID will overwrite existing
+    } catch (error) {
+      console.error(`  ⚠️ Error deleting old chunks for ${url}:`, error);
+    }
+  }
+
+  let successCount = 0;
+  let errorCount = 0;
+  let splitCount = 0;
+
+  // Process in batches
+  const batchSize = 5;
+
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+
+    const batchPromises = batch.map(async (chunk, idx) => {
+      try {
+        const globalIdx = i + idx + 1;
+        console.log(`  [${globalIdx}/${chunks.length}] Processing chunk...`);
+
+        // Check if chunk needs to be split
+        const subChunks = splitOversizedChunk(chunk.content);
+
+        if (subChunks.length > 1) {
+          console.log(`    📦 Auto-splitting into ${subChunks.length} parts`);
+          splitCount++;
+        }
+
+        // Process each sub-chunk
+        for (let subIdx = 0; subIdx < subChunks.length; subIdx++) {
+          const subContent = subChunks[subIdx];
+
+          // Generate embedding
+          const embedding = await generateEmbedding(subContent);
+
+          const baseChunkIndex = chunk.metadata?.chunkIndex || 0;
+          const actualChunkIndex = baseChunkIndex * 1000 + subIdx;
+
+          const title =
+            subChunks.length > 1
+              ? `${chunk.title} (Part ${subIdx + 1}/${subChunks.length})`
+              : chunk.title;
+
+          // Generate deterministic UUID
+          const chunkIdInput = `${source}:${chunk.url}:${baseChunkIndex}:${subIdx}`;
+          const hash = crypto
+            .createHash("sha1")
+            .update(chunkIdInput)
+            .digest("hex");
+
+          const chunkId = [
+            hash.substring(0, 8),
+            hash.substring(8, 12),
+            "5" + hash.substring(13, 16),
+            ((parseInt(hash.substring(16, 18), 16) & 0x3f) | 0x80).toString(
+              16
+            ) + hash.substring(18, 20),
+            hash.substring(20, 32),
+          ].join("-");
+
+          // Upsert to Qdrant
+          await qdrant.upsertPoints([
+            {
+              id: chunkId,
+              vector: embedding,
+              payload: {
+                source: chunk.source,
+                url: chunk.url,
+                title: title,
+                content: subContent,
+                chunk_index: actualChunkIndex,
+                ...chunk.metadata,
+                splitPart: subChunks.length > 1 ? subIdx + 1 : undefined,
+                totalParts: subChunks.length > 1 ? subChunks.length : undefined,
+              },
+            },
+          ]);
+
+          // Upsert to Supabase (use upsert for partial mode)
+          const { error } = await supabase.from("doc_chunk_meta").upsert(
+            {
+              id: chunkId,
+              qdrant_id: chunkId,
+              url: chunk.url,
+              title: title,
+              source: chunk.source,
+              chunk_index: actualChunkIndex,
+            },
+            { onConflict: "id" }
+          );
+
+          if (error) throw error;
+
+          console.log(
+            `    ✅ Indexed chunk ${globalIdx}${
+              subIdx > 0 ? `.${subIdx + 1}` : ""
+            }`
+          );
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`  ❌ Error processing chunk:`, error);
+        errorCount++;
+      }
+    });
+
+    await Promise.all(batchPromises);
+
+    // Rate limiting
+    if (i + batchSize < chunks.length) {
+      console.log(`  ⏳ Waiting 2s to avoid rate limits...\n`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+
+  console.log(`\n✅ Partial indexing complete!`);
+  console.log(`   Success: ${successCount}`);
+  console.log(`   Errors: ${errorCount}`);
+  if (splitCount > 0) {
+    console.log(`   🔄 Auto-split: ${splitCount} oversized chunks`);
+  }
 }
 
 main().catch(console.error);
