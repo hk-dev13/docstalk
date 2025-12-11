@@ -238,15 +238,29 @@ fastify.post<{
         Connection: "keep-alive",
       });
 
-      // Stream response
+      // TODO: Integrate with actual user subscription check
+      const isPremium = true; // Enable for all users during testing
+
+      // Stream response with online search support
       for await (const part of ragService.generateAnswerStream(
         query,
         docSource,
         conversationHistory,
-        responseMode
+        responseMode,
+        { isPremium, userId }
       )) {
         if (part.type === "content") {
+          reply.raw.write(`event: content\n`);
           reply.raw.write(`data: ${JSON.stringify({ chunk: part.text })}\n\n`);
+        } else if (part.type === "references") {
+          reply.raw.write(`event: references\n`);
+          reply.raw.write(`data: ${JSON.stringify(part.data)}\n\n`);
+        } else if (part.type === "status") {
+          reply.raw.write(`event: status\n`);
+          reply.raw.write(`data: ${JSON.stringify({ text: part.text })}\n\n`);
+        } else if (part.type === "source_discovered") {
+          reply.raw.write(`event: source_discovered\n`);
+          reply.raw.write(`data: ${JSON.stringify(part.data)}\n\n`);
         }
       }
 
@@ -255,7 +269,8 @@ fastify.post<{
         await ragService.incrementUsage(userId);
       }
 
-      reply.raw.write("data: [DONE]\n\n");
+      reply.raw.write(`event: done\n`);
+      reply.raw.write(`data: {}\n\n`);
       reply.raw.end();
     } catch (error) {
       fastify.log.error(error);

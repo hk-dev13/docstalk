@@ -13,6 +13,9 @@ export interface ChatMessage {
   isStreaming?: boolean;
   reasoning?: string; // For AI reasoning display
   queryType?: "meta" | "specific" | "ambiguous"; // For UI warnings
+  // Self-learning RAG fields
+  isSearchingOnline?: boolean;
+  discoveredSource?: { url: string; isNew: boolean };
 }
 
 // Auto-detect types
@@ -55,6 +58,8 @@ export type AutoDetectEvent =
       data: Array<{ title: string; url: string; snippet: string }>;
     }
   | { event: "clarification"; data: ClarificationResponse }
+  | { event: "status"; data: { text: string } }
+  | { event: "source_discovered"; data: { url: string; isNew: boolean } }
   | { event: "done"; data: {} };
 
 /**

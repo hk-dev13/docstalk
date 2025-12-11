@@ -1,6 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { QdrantService } from "./qdrant.service.js";
+import {
+  OnlineSearchService,
+  onlineSearchService,
+} from "./online-search.service.js";
+import { AutoIndexService, autoIndexService } from "./auto-index.service.js";
 
 interface SearchResult {
   id: string;
@@ -31,6 +36,8 @@ export class RAGService {
   private client: GoogleGenAI;
   public supabase: SupabaseClient;
   private qdrant: QdrantService;
+  private onlineSearch: OnlineSearchService;
+  private autoIndex: AutoIndexService;
 
   constructor() {
     this.client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -39,6 +46,8 @@ export class RAGService {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
     this.qdrant = new QdrantService();
+    this.onlineSearch = onlineSearchService;
+    this.autoIndex = autoIndexService;
   }
 
   async initialize() {
@@ -551,6 +560,29 @@ Always reply in user language even if not configured.`,
   }
 
   /**
+   * Check if search results are low quality (should trigger online search)
+   * Used for self-learning RAG fallback
+   */
+  private isLowQuality(results: SearchResult[]): boolean {
+    // No results at all
+    if (results.length === 0) return true;
+
+    // Very few results
+    if (results.length < 2) return true;
+
+    // Check average similarity score
+    const avgSimilarity =
+      results.reduce((sum, r) => sum + r.similarity, 0) / results.length;
+    if (avgSimilarity < 0.5) return true;
+
+    // Check if top result has very short content
+    const topResult = results[0];
+    if (topResult.content.length < 100) return true;
+
+    return false;
+  }
+
+  /**
    * Get expanded context (Not implemented for Qdrant yet, returning original chunks)
    * TODO: Implement window retrieval in Qdrant if needed
    */
@@ -710,26 +742,104 @@ Give your answer now based on the instructions above.
    */
   /**
    * Generate streaming answer using RAG with Dynamic Language & Smart Fallback
+   * Includes Self-Learning RAG: Online search fallback when Qdrant has no results
    */
   async *generateAnswerStream(
     query: string,
     source?: string | string[],
     conversationHistory?: Array<{ role: string; content: string }>,
-    responseMode: string = "friendly"
+    responseMode: string = "friendly",
+    options?: { isPremium?: boolean; userId?: string }
   ): AsyncGenerator<
-    { type: "content"; text: string } | { type: "references"; data: any[] },
+    | { type: "content"; text: string }
+    | { type: "references"; data: any[] }
+    | { type: "status"; text: string }
+    | { type: "source_discovered"; data: { url: string; isNew: boolean } },
     void,
     unknown
   > {
     // 1. Reformulate query
     const searchQuery = await this.reformulateQuery(query, conversationHistory);
 
-    // 2. Search for relevant context
-    const searchResults = await this.searchDocumentation(
-      searchQuery,
-      source,
-      5
-    );
+    // 2. Search for relevant context in Qdrant
+    let searchResults = await this.searchDocumentation(searchQuery, source, 5);
+    let usedOnlineSearch = false;
+    let discoveredUrl: string | null = null;
+
+    // 3. SELF-LEARNING RAG: Online search fallback (Premium only)
+    const isPremium = options?.isPremium ?? false;
+    if (
+      isPremium &&
+      this.onlineSearch.isEnabled() &&
+      this.isLowQuality(searchResults)
+    ) {
+      // Notify frontend we're searching online
+      yield { type: "status", text: "Searching online documentation..." };
+
+      try {
+        // Get ecosystem hint from source
+        const ecosystemHint = Array.isArray(source) ? source[0] : source;
+
+        // Search online documentation
+        const onlineResults = await this.onlineSearch.searchDocumentation(
+          query,
+          ecosystemHint,
+          3
+        );
+
+        if (onlineResults.length > 0) {
+          const topResult = onlineResults[0];
+          console.log(`[RAG] Online search found: ${topResult.url}`);
+
+          // Scrape the top result
+          const scraped = await this.onlineSearch.scrapeUrl(topResult.url);
+
+          // Check if we should index this content
+          const action = await this.autoIndex.shouldIndex(
+            scraped.url,
+            scraped.contentHash
+          );
+
+          if (action !== "skip") {
+            // Queue for background indexing
+            this.autoIndex.queueForIndexing([
+              {
+                url: scraped.url,
+                title: scraped.title,
+                content: scraped.content,
+                source: scraped.source,
+                contentHash: scraped.contentHash,
+                discoveredBy: options?.userId,
+                queryThatFound: query,
+              },
+            ]);
+
+            // Notify frontend about the discovered source
+            yield {
+              type: "source_discovered",
+              data: { url: scraped.url, isNew: action === "new" },
+            };
+            discoveredUrl = scraped.url;
+          }
+
+          // Convert scraped content to search results format
+          searchResults = [
+            {
+              id: `online-${Date.now()}`,
+              content: scraped.content.substring(0, 3000), // Limit content size
+              url: scraped.url,
+              title: scraped.title,
+              source: scraped.source,
+              similarity: 1.0, // High confidence since it's exact match
+            },
+          ];
+          usedOnlineSearch = true;
+        }
+      } catch (error) {
+        console.error("[RAG] Online search fallback failed:", error);
+        // Continue with original (empty) results
+      }
+    }
 
     // Yield references immediately
     const references = searchResults.slice(0, 5).map((result) => ({
@@ -739,7 +849,7 @@ Give your answer now based on the instructions above.
     }));
     yield { type: "references", data: references };
 
-    // 3. Build context
+    // 4. Build context
     const context = searchResults
       .map(
         (result) => `[${result.title}]
@@ -749,7 +859,7 @@ Content: ${result.content}
       )
       .join("\n---\n");
 
-    // 4. Build conversation history
+    // 5. Build conversation history
     const historyContext =
       conversationHistory && conversationHistory.length > 0
         ? `\n**Previous conversation:**\n${conversationHistory
@@ -758,15 +868,19 @@ Content: ${result.content}
             .join("\n")}\n\n`
         : "";
 
-    // 5. Get Persona
+    // 6. Get Persona
     const { persona, style } = this.getResponseModePersona(responseMode);
 
-    // 6. BUILD THE GLOBAL-READY PROMPT (SAMA PERSIS DENGAN NON-STREAM AGAR KONSISTEN)
+    // 7. BUILD THE GLOBAL-READY PROMPT
     const targetSources = Array.isArray(source)
       ? source.join(", ")
       : source
       ? source
       : "General Knowledge";
+
+    const onlineSearchNote = usedOnlineSearch
+      ? "\n**Note:** Documentation was found via online search and has been indexed for future queries."
+      : "";
 
     const prompt = `
 ${persona}
@@ -776,6 +890,7 @@ ${historyContext}
 **User Question:** "${query}"
 
 **Target Documentation Sources:** ${targetSources}
+${onlineSearchNote}
 
 **Available Documentation Context:**
 ${context || "No specific documentation found for this query."}
@@ -802,12 +917,12 @@ ${style}
 Give your answer now.
 `;
 
-    // 7. Generate Stream
+    // 8. Generate Stream
     const result = await this.client.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        temperature: 0.3, // Samakan dengan non-stream
+        temperature: 0.3,
         maxOutputTokens: 4096,
       },
     });
@@ -817,6 +932,14 @@ Give your answer now.
       if (!text) continue;
 
       yield { type: "content", text };
+    }
+
+    // 9. Final status if online search was used
+    if (usedOnlineSearch && discoveredUrl) {
+      yield {
+        type: "status",
+        text: "✨ New documentation indexed for future questions!",
+      };
     }
   }
 

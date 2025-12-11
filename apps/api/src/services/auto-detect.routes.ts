@@ -176,7 +176,12 @@ export async function registerAutoDetectRoutes(
           })}\n\n`
         );
 
-        // Stream content chunks
+        // Get user info for premium check
+        // TODO: Integrate with actual user subscription check
+        const userId = (request as any).userId || undefined;
+        const isPremium = true; // For now, enable for all users during testing
+
+        // Stream content chunks with online search support
         const streamGenerator = ragService.generateAnswerStream(
           query,
           additionalSources.length > 0
@@ -185,7 +190,8 @@ export async function registerAutoDetectRoutes(
             ? undefined
             : primarySource,
           history,
-          "auto"
+          "auto",
+          { isPremium, userId }
         );
 
         for await (const part of streamGenerator) {
@@ -196,6 +202,14 @@ export async function registerAutoDetectRoutes(
             );
           } else if (part.type === "references") {
             reply.raw.write(`event: references\n`);
+            reply.raw.write(`data: ${JSON.stringify(part.data)}\n\n`);
+          } else if (part.type === "status") {
+            // New: Status events for online search
+            reply.raw.write(`event: status\n`);
+            reply.raw.write(`data: ${JSON.stringify({ text: part.text })}\n\n`);
+          } else if (part.type === "source_discovered") {
+            // New: Source discovered via online search
+            reply.raw.write(`event: source_discovered\n`);
             reply.raw.write(`data: ${JSON.stringify(part.data)}\n\n`);
           }
         }
