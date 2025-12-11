@@ -836,8 +836,13 @@ Give your answer now based on the instructions above.
       yield { type: "status", text: "Searching online documentation..." };
 
       try {
-        // Get ecosystem hint from source
-        const ecosystemHint = Array.isArray(source) ? source[0] : source;
+        // If user forced online search, search ALL domains (ignore router)
+        // Otherwise use ecosystem hint from router detection
+        const ecosystemHint = forceOnlineSearch
+          ? undefined // Search ALL allowed domains
+          : Array.isArray(source)
+          ? source[0]
+          : source;
 
         // Search online documentation
         const onlineResults = await this.onlineSearch.searchDocumentation(
