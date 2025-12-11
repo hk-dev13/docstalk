@@ -83,6 +83,7 @@ export default function ChatPage() {
   const [sessionContext, setSessionContext] = useState<SessionContext | null>(
     null
   );
+  const [onlineSearchEnabled, setOnlineSearchEnabled] = useState(false);
 
   // Swipe Gesture Logic
   const minSwipeDistance = 50;
@@ -364,7 +365,8 @@ export default function ChatPage() {
         conversationId || undefined,
         history,
         responseMode,
-        sourceToUse
+        sourceToUse,
+        onlineSearchEnabled
       )) {
         console.log("[Unified Handler] Event:", event.event);
 
@@ -863,6 +865,8 @@ export default function ChatPage() {
             disabled={isStreaming || usage.count >= usage.limit}
             responseMode={responseMode}
             onResponseModeChange={setResponseMode}
+            onlineSearchEnabled={onlineSearchEnabled}
+            onOnlineSearchToggle={setOnlineSearchEnabled}
           />
         </div>
       </div>

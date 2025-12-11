@@ -799,7 +799,11 @@ Give your answer now based on the instructions above.
     source?: string | string[],
     conversationHistory?: Array<{ role: string; content: string }>,
     responseMode: string = "friendly",
-    options?: { isPremium?: boolean; userId?: string }
+    options?: {
+      isPremium?: boolean;
+      userId?: string;
+      forceOnlineSearch?: boolean;
+    }
   ): AsyncGenerator<
     | { type: "content"; text: string }
     | { type: "references"; data: any[] }
@@ -816,13 +820,14 @@ Give your answer now based on the instructions above.
     let usedOnlineSearch = false;
     let discoveredUrl: string | null = null;
 
-    // 3. SELF-LEARNING RAG: Online search fallback (Premium only)
+    // 3. SELF-LEARNING RAG: Online search fallback
+    //    Trigger when: (Premium + LowQuality results) OR (forceOnlineSearch toggle)
     const isPremium = options?.isPremium ?? false;
-    if (
-      isPremium &&
-      this.onlineSearch.isEnabled() &&
-      this.isLowQuality(searchResults)
-    ) {
+    const forceOnlineSearch = options?.forceOnlineSearch ?? false;
+    const shouldSearchOnline =
+      (isPremium && this.isLowQuality(searchResults)) || forceOnlineSearch;
+
+    if (shouldSearchOnline && this.onlineSearch.isEnabled()) {
       // Notify frontend we're searching online
       yield { type: "status", text: "Searching online documentation..." };
 
