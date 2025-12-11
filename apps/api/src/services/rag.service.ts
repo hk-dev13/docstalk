@@ -317,48 +317,96 @@ export class RAGService {
     query: string,
     conversationHistory?: Array<{ role: string; content: string }>
   ): Promise<string> {
-    // If no history or query is already detailed, return as-is
-    if (!conversationHistory || conversationHistory.length === 0) {
-      return query;
-    }
+    // Time-sensitive patterns - ALWAYS need reformulation to add context
+    const timeSensitivePatterns = [
+      /terbaru|latest|newest|current|sekarang|saat ini/i,
+      /versi|version|release|v\d+/i,
+      /update|upgrade|baru|new/i,
+    ];
+    const isTimeSensitive = timeSensitivePatterns.some((p) => p.test(query));
 
-    // Check if query is too generic (needs reformulation)
+    // Check if query references something from previous conversation
+    const referencePatterns = [
+      /^(itu|that|this|tersebut|di atas|above)/i,
+      /^(apa itu|what is|what's|apakah)/i,
+      /CVE-\d+/i, // Specific identifiers
+    ];
+    const hasReference = referencePatterns.some((p) => p.test(query));
+
+    // Generic question patterns
     const genericPatterns = [
       /^(jelaskan|explain|apa|what|how|bagaimana|kenapa|why|bisa|can|could)/i,
       /^(dengan|in|using|pakai).*(bahasa indonesia|english|spanish)/i,
       /^(lebih detail|more detail|elaborate)/i,
     ];
-
     const isGeneric = genericPatterns.some((pattern) => pattern.test(query));
 
-    // If query has technical keywords, probably doesn't need reformulation
+    // Check for technical keywords
     const hasTechnicalKeywords =
-      /next\.?js|react|typescript|middleware|component|api|server|client|route|proxy|edge|runtime/i.test(
+      /next\.?js|react|typescript|middleware|component|api|server|client|route|proxy|edge|runtime|docker|prisma|tailwind/i.test(
         query
       );
 
-    if (!isGeneric && hasTechnicalKeywords) {
+    // Determine if we need reformulation
+    const needsReformulation =
+      isTimeSensitive ||
+      hasReference ||
+      isGeneric ||
+      (conversationHistory &&
+        conversationHistory.length > 0 &&
+        !hasTechnicalKeywords);
+
+    if (!needsReformulation) {
       return query;
     }
 
     // Use LLM to reformulate query based on history
     try {
-      const historyContext = conversationHistory
-        .slice(-3) // Use last 3 messages for context
-        .map((msg) => `${msg.role}: ${msg.content}`)
-        .join("\n");
+      // Build history context - include assistant responses for entity extraction
+      let historyContext = "";
+      if (conversationHistory && conversationHistory.length > 0) {
+        historyContext = conversationHistory
+          .slice(-4) // Use last 4 messages for more context
+          .map((msg) => `${msg.role}: ${msg.content.substring(0, 500)}`) // Limit length
+          .join("\n");
+      }
 
-      const reformulationPrompt = `Given this conversation history:
+      // Extract likely topic from history if no keywords in current query
+      let topicHint = "";
+      if (!hasTechnicalKeywords && conversationHistory) {
+        const recentAssistant = conversationHistory
+          .filter((m) => m.role === "assistant")
+          .pop();
+        if (recentAssistant) {
+          // Extract technology mentions from recent response
+          const techMentions = recentAssistant.content.match(
+            /Next\.?js|React|TypeScript|Docker|Prisma|Vue|PostgreSQL|Express|Python|Go|Rust|FastAPI|Tailwind/gi
+          );
+          if (techMentions) {
+            topicHint = `Related to: ${[...new Set(techMentions)].join(", ")}`;
+          }
+        }
+      }
 
-${historyContext}
+      const reformulationPrompt = `You are a query reformulation assistant for a documentation search system.
 
-The user now asks: "${query}"
+${historyContext ? `Conversation history:\n${historyContext}\n` : ""}
+${topicHint ? `${topicHint}\n` : ""}
+
+User's current query: "${query}"
 
 Task: Rewrite this question as a standalone, searchable query that:
-1. Preserves the technical context from conversation history
-2. Includes relevant keywords for documentation search
-3. Is in English (even if user asked in Indonesian)
-4. Is concise (max 15 words)
+1. Preserves the technical context from conversation (if any)
+2. Includes specific technology names (e.g., "Next.js", "React", "Docker")
+3. For version/release questions, include phrases like "release notes", "changelog", "latest version"
+4. Is in English (translate if needed)
+5. Is concise (max 20 words)
+
+${
+  isTimeSensitive
+    ? "IMPORTANT: This is a TIME-SENSITIVE query about versions/updates. Include 'latest', 'release notes', or 'changelog' keywords."
+    : ""
+}
 
 Output ONLY the reformulated query, nothing else.
 
@@ -368,7 +416,7 @@ Reformulated query:`;
         model: "gemini-2.5-flash",
         contents: reformulationPrompt,
         config: {
-          temperature: 0.1, // Low temp for consistent reformulation
+          temperature: 0.1,
           maxOutputTokens: 100,
         },
       });
@@ -384,7 +432,7 @@ Reformulated query:`;
       return reformulated;
     } catch (error) {
       console.error("Query reformulation failed, using original:", error);
-      return query; // Fallback to original on error
+      return query;
     }
   }
 
@@ -528,13 +576,15 @@ Always reply in user language even if not configured.`,
       // Reject very short content
       if (content.length < 50) return false;
 
-      // Reject if mostly navigation/menu patterns
+      // Reject if mostly navigation/menu patterns (not version info!)
       const navPatterns = [
         /^Menu\s*$/i,
         /^Using App Router$/i,
         /^Features available in/i,
-        /^Latest Version/i,
-        /^Version \d+\.\d+/i,
+        // REMOVED: /^Latest Version/i - This is valid content!
+        // REMOVED: /^Version \d+\.\d+/i - This is valid content!
+        /^Skip to content$/i,
+        /^Toggle navigation$/i,
       ];
 
       if (navPatterns.some((pattern) => pattern.test(content))) {
@@ -749,7 +799,11 @@ Give your answer now based on the instructions above.
     source?: string | string[],
     conversationHistory?: Array<{ role: string; content: string }>,
     responseMode: string = "friendly",
-    options?: { isPremium?: boolean; userId?: string }
+    options?: {
+      isPremium?: boolean;
+      userId?: string;
+      forceOnlineSearch?: boolean;
+    }
   ): AsyncGenerator<
     | { type: "content"; text: string }
     | { type: "references"; data: any[] }
@@ -766,13 +820,14 @@ Give your answer now based on the instructions above.
     let usedOnlineSearch = false;
     let discoveredUrl: string | null = null;
 
-    // 3. SELF-LEARNING RAG: Online search fallback (Premium only)
+    // 3. SELF-LEARNING RAG: Online search fallback
+    //    Trigger when: (Premium + LowQuality results) OR (forceOnlineSearch toggle)
     const isPremium = options?.isPremium ?? false;
-    if (
-      isPremium &&
-      this.onlineSearch.isEnabled() &&
-      this.isLowQuality(searchResults)
-    ) {
+    const forceOnlineSearch = options?.forceOnlineSearch ?? false;
+    const shouldSearchOnline =
+      (isPremium && this.isLowQuality(searchResults)) || forceOnlineSearch;
+
+    if (shouldSearchOnline && this.onlineSearch.isEnabled()) {
       // Notify frontend we're searching online
       yield { type: "status", text: "Searching online documentation..." };
 

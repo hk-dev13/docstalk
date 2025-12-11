@@ -8,6 +8,7 @@ interface ChatRequest {
   history?: Array<{ role: string; content: string }>;
   stream?: boolean;
   forceDocSource?: string; // User manually selected from clarification popup
+  forceOnlineSearch?: boolean; // User toggled online search button
 }
 
 export async function registerAutoDetectRoutes(
@@ -26,6 +27,7 @@ export async function registerAutoDetectRoutes(
         history,
         stream = true, // Default to streaming since this is /stream endpoint
         forceDocSource,
+        forceOnlineSearch,
       } = request.body;
 
       // BYPASS: If user already selected source from clarification popup, skip AI detection
@@ -191,7 +193,7 @@ export async function registerAutoDetectRoutes(
             : primarySource,
           history,
           "auto",
-          { isPremium, userId }
+          { isPremium, userId, forceOnlineSearch }
         );
 
         for await (const part of streamGenerator) {

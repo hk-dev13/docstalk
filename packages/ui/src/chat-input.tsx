@@ -9,6 +9,8 @@ interface ChatInputProps {
   disabled?: boolean;
   responseMode: string;
   onResponseModeChange: (mode: string) => void;
+  onlineSearchEnabled?: boolean;
+  onOnlineSearchToggle?: (enabled: boolean) => void;
 }
 
 export function ChatInput({
@@ -16,6 +18,8 @@ export function ChatInput({
   disabled,
   responseMode,
   onResponseModeChange,
+  onlineSearchEnabled = false,
+  onOnlineSearchToggle,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -76,15 +80,55 @@ export function ChatInput({
                   onChange={(e) => onResponseModeChange(e.target.value)}
                   className="appearance-none pl-7 pr-6 py-1.5 rounded-lg bg-secondary/20 backdrop-blur-md border border-white/10 hover:bg-secondary/40 hover:border-white/20 text-xs font-medium text-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
                 >
-                  <option value="auto" className="bg-zinc-950 text-white">Auto</option>
-                  <option value="frontend" className="bg-zinc-950 text-white">Frontend</option>
-                  <option value="backend" className="bg-zinc-950 text-white">Backend</option>
-                  <option value="fullstack" className="bg-zinc-950 text-white">Fullstack</option>
-                  <option value="debug" className="bg-zinc-950 text-white">Debug</option>
-                  <option value="architecture" className="bg-zinc-950 text-white">Architecture</option>
+                  <option value="auto" className="bg-zinc-950 text-white">
+                    Auto
+                  </option>
+                  <option value="frontend" className="bg-zinc-950 text-white">
+                    Frontend
+                  </option>
+                  <option value="backend" className="bg-zinc-950 text-white">
+                    Backend
+                  </option>
+                  <option value="fullstack" className="bg-zinc-950 text-white">
+                    Fullstack
+                  </option>
+                  <option value="debug" className="bg-zinc-950 text-white">
+                    Debug
+                  </option>
+                  <option
+                    value="architecture"
+                    className="bg-zinc-950 text-white"
+                  >
+                    Architecture
+                  </option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-foreground/50 pointer-events-none" />
               </div>
+
+              {/* Online Search Toggle */}
+              {onOnlineSearchToggle && (
+                <button
+                  type="button"
+                  onClick={() => onOnlineSearchToggle(!onlineSearchEnabled)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
+                    onlineSearchEnabled
+                      ? "bg-blue-500/20 border-blue-500/50 text-blue-400 hover:bg-blue-500/30"
+                      : "bg-secondary/20 border-white/10 text-muted-foreground hover:bg-secondary/40 hover:border-white/20"
+                  }`}
+                  title={
+                    onlineSearchEnabled
+                      ? "Online search enabled"
+                      : "Enable online search"
+                  }
+                >
+                  <Globe
+                    className={`h-3.5 w-3.5 ${
+                      onlineSearchEnabled ? "animate-pulse" : ""
+                    }`}
+                  />
+                  <span className="hidden sm:inline">Web</span>
+                </button>
+              )}
             </div>
 
             <Button

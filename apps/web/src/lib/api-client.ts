@@ -73,7 +73,8 @@ export async function* streamChatAuto(
   conversationId?: string,
   conversationHistory?: Array<{ role: string; content: string }>,
   responseMode?: string,
-  forceDocSource?: string
+  forceDocSource?: string,
+  forceOnlineSearch?: boolean
 ): AsyncGenerator<AutoDetectEvent> {
   try {
     const response = await fetch(`${API_URL}/api/backend/chat/auto/stream`, {
@@ -90,6 +91,7 @@ export async function* streamChatAuto(
         conversationHistory,
         responseMode,
         forceDocSource,
+        forceOnlineSearch,
       }),
     });
 
