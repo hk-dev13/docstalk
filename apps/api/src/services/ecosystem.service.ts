@@ -99,7 +99,9 @@ export class EcosystemService {
   ): EcosystemDetectionResult | null {
     for (const ecosystem of ecosystems) {
       if (
-        ecosystem.aliases?.some((alias: string) => query.includes(alias.toLowerCase()))
+        ecosystem.aliases?.some((alias: string) =>
+          query.includes(alias.toLowerCase())
+        )
       ) {
         return {
           ecosystem,
@@ -118,35 +120,47 @@ export class EcosystemService {
   ): EcosystemDetectionResult | null {
     let bestMatch: DocEcosystem | null = null;
     let maxScore = 0;
+    let matchedKeywords: string[] = [];
 
     for (const ecosystem of ecosystems) {
       let score = 0;
+      const matched: string[] = [];
 
       // Check primary keywords
       ecosystem.keywords.forEach((kw: string) => {
-        if (query.includes(kw.toLowerCase())) score += 10;
+        if (query.includes(kw.toLowerCase())) {
+          score += 10;
+          matched.push(kw);
+        }
       });
 
-      // Check keyword groups
+      // Check keyword groups - SAME WEIGHT as primary keywords
+      // This ensures redis/mongodb/aws etc. get properly detected
       if (ecosystem.keyword_groups) {
-        Object.values(ecosystem.keyword_groups)
-          .flat()
-          .forEach((kw: string) => {
-            if (query.includes(kw.toLowerCase())) score += 5;
-          });
+        Object.entries(ecosystem.keyword_groups).forEach(
+          ([group, keywords]) => {
+            (keywords as string[]).forEach((kw: string) => {
+              if (query.includes(kw.toLowerCase())) {
+                score += 10; // Same weight as primary keywords
+                matched.push(`${group}:${kw}`);
+              }
+            });
+          }
+        );
       }
 
       if (score > maxScore) {
         maxScore = score;
         bestMatch = ecosystem;
+        matchedKeywords = matched;
       }
     }
 
     if (bestMatch && maxScore >= 10) {
       return {
         ecosystem: bestMatch,
-        confidence: 85,
-        reasoning: `Matched ${maxScore / 5} keywords`,
+        confidence: Math.min(95, 70 + matchedKeywords.length * 5),
+        reasoning: `Matched keywords: [${matchedKeywords.join(", ")}]`,
         suggestedDocSources: this.getSourcesForEcosystem(
           (bestMatch as DocEcosystem).id
         ),
